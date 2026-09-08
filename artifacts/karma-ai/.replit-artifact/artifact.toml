@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "KARMA AI"
+description = "A professional AI learning assistant for India's Official Statistical System, helping officials explore learning materials, ask questions, generate quizzes, and build future-ready skills."
+version = "1.0.0"
+id = "artifacts/karma-ai"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19292
+
+[services.development]
+run = "pnpm --filter @workspace/karma-ai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/karma-ai", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/karma-ai/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19292"
+BASE_PATH = "/"
