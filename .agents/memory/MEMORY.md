@@ -1,0 +1,1 @@
+- [Gemini model compatibility](gemini-model-availability.md) — Direct Gemini API access may reject older models for new users; keep the model configurable and preserve provider error context.

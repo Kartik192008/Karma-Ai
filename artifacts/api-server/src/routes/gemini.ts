@@ -3,7 +3,7 @@ import { SendGeminiChatBody, SendGeminiChatResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.6-flash";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const KARMA_SYSTEM_PROMPT = `You are KARMA AI, a precise and encouraging learning assistant for officials and learners working with India's Official Statistical System.
