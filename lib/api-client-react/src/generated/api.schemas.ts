@@ -49,7 +49,113 @@ export interface GeminiChatResponse {
   groundedInMaterial: boolean;
 }
 
+export interface LearningRecommendationsQuery {
+  /**
+     * @minLength 2
+     * @maxLength 200
+     */
+  query: string;
+  /**
+     * @minimum 1
+     * @maximum 12
+     */
+  limit?: number;
+}
+
+export type RecommendationSourceId = typeof RecommendationSourceId[keyof typeof RecommendationSourceId];
+
+
+export const RecommendationSourceId = {
+  igot: 'igot',
+  nssta: 'nssta',
+} as const;
+
+export type RecommendationSourceStatus = typeof RecommendationSourceStatus[keyof typeof RecommendationSourceStatus];
+
+
+export const RecommendationSourceStatus = {
+  available: 'available',
+  unavailable: 'unavailable',
+} as const;
+
+export interface RecommendationSource {
+  id: RecommendationSourceId;
+  name: string;
+  status: RecommendationSourceStatus;
+  endpoint: string;
+  /** @nullable */
+  message: string | null;
+}
+
+export type LearningRecommendationSource = typeof LearningRecommendationSource[keyof typeof LearningRecommendationSource];
+
+
+export const LearningRecommendationSource = {
+  igot: 'igot',
+  nssta: 'nssta',
+} as const;
+
+export type LearningRecommendationType = typeof LearningRecommendationType[keyof typeof LearningRecommendationType];
+
+
+export const LearningRecommendationType = {
+  course: 'course',
+  programme: 'programme',
+} as const;
+
+export interface LearningRecommendation {
+  id: string;
+  source: LearningRecommendationSource;
+  sourceName: string;
+  title: string;
+  summary: string;
+  type: LearningRecommendationType;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  relevance: number;
+  destinationUrl: string;
+  /** @nullable */
+  provider: string | null;
+  /** @nullable */
+  duration: string | null;
+  /** @nullable */
+  schedule: string | null;
+}
+
+export type LearningRecommendationsResponseCatalogueStatus = typeof LearningRecommendationsResponseCatalogueStatus[keyof typeof LearningRecommendationsResponseCatalogueStatus];
+
+
+export const LearningRecommendationsResponseCatalogueStatus = {
+  available: 'available',
+  partial: 'partial',
+  unavailable: 'unavailable',
+} as const;
+
+export interface LearningRecommendationsResponse {
+  query: string;
+  catalogueStatus: LearningRecommendationsResponseCatalogueStatus;
+  recommendations: LearningRecommendation[];
+  sources: RecommendationSource[];
+}
+
 export interface ErrorResponse {
   error: string;
 }
+
+export type GetLearningRecommendationsParams = {
+/**
+ * Competency, topic, or learning goal to search for
+ * @minLength 2
+ * @maxLength 200
+ */
+query: string;
+/**
+ * Maximum number of recommendations to return
+ * @minimum 1
+ * @maximum 12
+ */
+limit?: number;
+};
 

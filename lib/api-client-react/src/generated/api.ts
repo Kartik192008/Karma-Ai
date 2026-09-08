@@ -23,7 +23,9 @@ import type {
   ErrorResponse,
   GeminiChatInput,
   GeminiChatResponse,
-  HealthStatus
+  GetLearningRecommendationsParams,
+  HealthStatus,
+  LearningRecommendationsResponse
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -122,15 +124,8 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
-  return withQueryKey(query, queryOptions.queryKey);
+   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
-
 export const getSendGeminiChatUrl = () => {
 
 
@@ -203,3 +198,81 @@ export const useSendGeminiChat = <TError = ErrorType<ErrorResponse>,
       return useMutation(getSendGeminiChatMutationOptions(options));
     }
 
+export const getGetLearningRecommendationsUrl = (params: GetLearningRecommendationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/learning-recommendations?${stringifiedParams}` : `/api/learning-recommendations`
+}
+
+/**
+ * Searches the public iGOT Karmayogi course catalogue and NSSTA training catalogue. Results are normalized with an official destination link and source availability is returned explicitly when a catalogue cannot be reached.
+ * @summary Find official learning recommendations
+ */
+export const getLearningRecommendations = async (params: GetLearningRecommendationsParams, options?: Parameters<typeof customFetch>[1]): Promise<LearningRecommendationsResponse> => {
+
+  return customFetch<LearningRecommendationsResponse>(getGetLearningRecommendationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLearningRecommendationsQueryKey = (params?: GetLearningRecommendationsParams,) => {
+    return [
+    `/api/learning-recommendations`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetLearningRecommendationsQueryOptions = <TData = Awaited<ReturnType<typeof getLearningRecommendations>>, TError = ErrorType<ErrorResponse>>(params: GetLearningRecommendationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLearningRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLearningRecommendationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLearningRecommendations>>> = ({ signal }) => getLearningRecommendations(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLearningRecommendations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLearningRecommendationsQueryResult = NonNullable<Awaited<ReturnType<typeof getLearningRecommendations>>>
+export type GetLearningRecommendationsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Find official learning recommendations
+ */
+
+export function useGetLearningRecommendations<TData = Awaited<ReturnType<typeof getLearningRecommendations>>, TError = ErrorType<ErrorResponse>>(
+ params: GetLearningRecommendationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLearningRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLearningRecommendationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+   return withQueryKey(query, queryOptions.queryKey);
+}

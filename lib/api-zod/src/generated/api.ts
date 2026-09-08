@@ -49,3 +49,51 @@ export const SendGeminiChatResponse = zod.object({
 })
 
 
+/**
+ * Searches the public iGOT Karmayogi course catalogue and NSSTA training catalogue. Results are normalized with an official destination link and source availability is returned explicitly when a catalogue cannot be reached.
+ * @summary Find official learning recommendations
+ */
+export const getLearningRecommendationsQueryQueryMin = 2;
+export const getLearningRecommendationsQueryQueryMax = 200;
+
+export const getLearningRecommendationsQueryLimitDefault = 6;
+export const getLearningRecommendationsQueryLimitMax = 12;
+
+
+
+export const GetLearningRecommendationsQueryParams = zod.object({
+  "query": zod.coerce.string().min(getLearningRecommendationsQueryQueryMin).max(getLearningRecommendationsQueryQueryMax).describe('Competency, topic, or learning goal to search for'),
+  "limit": zod.coerce.number().int().min(1).max(getLearningRecommendationsQueryLimitMax).default(getLearningRecommendationsQueryLimitDefault).describe('Maximum number of recommendations to return')
+})
+
+export const getLearningRecommendationsResponseRecommendationsItemRelevanceMin = 0;
+export const getLearningRecommendationsResponseRecommendationsItemRelevanceMax = 100;
+
+
+
+export const GetLearningRecommendationsResponse = zod.object({
+  "query": zod.string(),
+  "catalogueStatus": zod.enum(['available', 'partial', 'unavailable']),
+  "recommendations": zod.array(zod.object({
+  "id": zod.string(),
+  "source": zod.enum(['igot', 'nssta']),
+  "sourceName": zod.string(),
+  "title": zod.string(),
+  "summary": zod.string(),
+  "type": zod.enum(['course', 'programme']),
+  "relevance": zod.number().int().min(getLearningRecommendationsResponseRecommendationsItemRelevanceMin).max(getLearningRecommendationsResponseRecommendationsItemRelevanceMax),
+  "destinationUrl": zod.string().url(),
+  "provider": zod.string().nullable(),
+  "duration": zod.string().nullable(),
+  "schedule": zod.string().nullable()
+})),
+  "sources": zod.array(zod.object({
+  "id": zod.enum(['igot', 'nssta']),
+  "name": zod.string(),
+  "status": zod.enum(['available', 'unavailable']),
+  "endpoint": zod.string().url(),
+  "message": zod.string().nullable()
+}))
+})
+
+

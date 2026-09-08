@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: gemini
     description: KARMA AI learning assistant operations
+  - name: recommendations
+    description: Official iGOT Karmayogi and NSSTA learning recommendations
 paths:
   /healthz:
     get:
@@ -53,6 +55,49 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "502":
           description: AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /learning-recommendations:
+    get:
+      operationId: getLearningRecommendations
+      tags: [recommendations]
+      summary: Find official learning recommendations
+      description: Searches the public iGOT Karmayogi course catalogue and NSSTA training catalogue. Results are normalized with an official destination link and source availability is returned explicitly when a catalogue cannot be reached.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Competency, topic, or learning goal to search for
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 200
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of recommendations to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+            default: 6
+      responses:
+        "200":
+          description: Official recommendations and catalogue availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningRecommendationsResponse"
+        "400":
+          description: Invalid search query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Recommendation provider error
           content:
             application/json:
               schema:
@@ -111,6 +156,105 @@ components:
         - message
         - model
         - groundedInMaterial
+    LearningRecommendationsQuery:
+      type: object
+      properties:
+        query:
+          type: string
+          minLength: 2
+          maxLength: 200
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 12
+          default: 6
+      required:
+        - query
+    RecommendationSource:
+      type: object
+      properties:
+        id:
+          type: string
+          enum: [igot, nssta]
+        name:
+          type: string
+        status:
+          type: string
+          enum: [available, unavailable]
+        endpoint:
+          type: string
+          format: uri
+        message:
+          type: ["string", "null"]
+      required:
+        - id
+        - name
+        - status
+        - endpoint
+        - message
+    LearningRecommendation:
+      type: object
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+          enum: [igot, nssta]
+        sourceName:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        type:
+          type: string
+          enum: [course, programme]
+        relevance:
+          type: integer
+          minimum: 0
+          maximum: 100
+        destinationUrl:
+          type: string
+          format: uri
+        provider:
+          type: ["string", "null"]
+        duration:
+          type: ["string", "null"]
+        schedule:
+          type: ["string", "null"]
+      required:
+        - id
+        - source
+        - sourceName
+        - title
+        - summary
+        - type
+        - relevance
+        - destinationUrl
+        - provider
+        - duration
+        - schedule
+    LearningRecommendationsResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        catalogueStatus:
+          type: string
+          enum: [available, partial, unavailable]
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/LearningRecommendation"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecommendationSource"
+      required:
+        - query
+        - catalogueStatus
+        - recommendations
+        - sources
     ErrorResponse:
       type: object
       properties:

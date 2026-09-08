@@ -4,7 +4,12 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { useSendGeminiChat, type GeminiChatMessage } from '@workspace/api-client-react';
+import {
+  useGetLearningRecommendations,
+  useSendGeminiChat,
+  type GeminiChatMessage,
+  type LearningRecommendationsResponse,
+} from '@workspace/api-client-react';
 import {
   ArrowUpRight,
   BookOpen,
@@ -19,6 +24,7 @@ import {
   Lightbulb,
   Paperclip,
   Plus,
+  Search,
   Send,
   ShieldCheck,
   Sparkles,
@@ -228,9 +234,21 @@ function Chat() {
   const [requestError, setRequestError] = useState('');
   const [isReading, setIsReading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [recommendationQuery, setRecommendationQuery] = useState('');
+  const [submittedRecommendationQuery, setSubmittedRecommendationQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sendChat = useSendGeminiChat();
+  const recommendations = useGetLearningRecommendations(
+    { query: submittedRecommendationQuery || 'statistics', limit: 6 },
+    {
+      query: {
+        enabled: Boolean(submittedRecommendationQuery),
+        retry: 1,
+        queryKey: ['official-recommendations', submittedRecommendationQuery],
+      },
+    },
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -288,6 +306,14 @@ function Chat() {
     setRequestError('');
   };
 
+  const submitRecommendationSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = recommendationQuery.trim();
+    if (trimmed.length >= 2) {
+      setSubmittedRecommendationQuery(trimmed);
+    }
+  };
+
   return (
     <div className="grain flex min-h-[100dvh] flex-col bg-background text-foreground">
       <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-border bg-card/70 px-4 backdrop-blur-md sm:px-7">
@@ -333,6 +359,15 @@ function Chat() {
               )}
             </div>
             {fileError && <p className="mt-3 text-xs leading-5 text-destructive" role="alert" data-testid="status-file-error">{fileError}</p>}
+            <OfficialRecommendations
+              query={recommendationQuery}
+              submittedQuery={submittedRecommendationQuery}
+              response={recommendations.data}
+              isLoading={recommendations.isLoading}
+              error={recommendations.error}
+              onQueryChange={setRecommendationQuery}
+              onSubmit={submitRecommendationSearch}
+            />
             <div className="mt-auto hidden border-t border-border pt-5 md:block">
               <div className="flex items-start gap-2.5 text-muted-foreground">
                 <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -370,6 +405,113 @@ function Chat() {
         </main>
       </div>
     </div>
+  );
+}
+
+function OfficialRecommendations({
+  query,
+  submittedQuery,
+  response,
+  isLoading,
+  error,
+  onQueryChange,
+  onSubmit,
+}: {
+  query: string;
+  submittedQuery: string;
+  response?: LearningRecommendationsResponse;
+  isLoading: boolean;
+  error: Error | null;
+  onQueryChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="mt-7 border-t border-border pt-5" aria-labelledby="official-recommendations-title">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-mono-label text-[0.59rem] font-medium uppercase text-primary">Official catalogue</p>
+          <h2 id="official-recommendations-title" className="mt-2 text-base font-extrabold tracking-[-0.03em]">Find your next step</h2>
+        </div>
+        <BookOpen className="mt-1 size-4 shrink-0 text-primary" aria-hidden="true" />
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">Search live metadata from iGOT Karmayogi and NSSTA. KARMA never fills gaps with made-up courses.</p>
+      <form onSubmit={onSubmit} className="mt-4 flex gap-2" data-testid="form-recommendations">
+        <label htmlFor="recommendation-query" className="sr-only">Learning topic</label>
+        <input
+          id="recommendation-query"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="e.g. sample surveys"
+          maxLength={200}
+          className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary/50"
+          data-testid="input-recommendation-query"
+        />
+        <button
+          type="submit"
+          disabled={query.trim().length < 2 || isLoading}
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Search official catalogues"
+          data-testid="button-search-recommendations"
+        >
+          <Search className="size-3.5" />
+        </button>
+      </form>
+      {isLoading && <p className="mt-3 text-xs text-muted-foreground" role="status" data-testid="status-recommendations-loading">Checking official catalogues…</p>}
+      {error && <p className="mt-3 text-xs leading-5 text-destructive" role="alert" data-testid="status-recommendations-error">The official catalogues could not be reached. Try again later.</p>}
+      {response && !isLoading && (
+        <div className="mt-4 space-y-3" data-testid="recommendations-results">
+          <div className="flex flex-wrap gap-1.5">
+            {response.sources.map((source) => (
+              <span
+                key={source.id}
+                className={`rounded-full px-2 py-1 text-[0.55rem] font-bold uppercase tracking-[0.08em] ${source.status === 'available' ? 'bg-accent text-accent-foreground' : 'bg-destructive/10 text-destructive'}`}
+                title={source.message ?? `${source.name} is available`}
+                data-testid={`status-source-${source.id}`}
+              >
+                {source.name} · {source.status}
+              </span>
+            ))}
+          </div>
+          {response.recommendations.length > 0 ? (
+            response.recommendations.map((recommendation) => (
+              <article key={`${recommendation.source}-${recommendation.id}`} className="rounded-xl border border-border bg-card p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-mono-label text-[0.55rem] font-medium uppercase text-primary">{recommendation.sourceName} · {recommendation.type}</span>
+                  <span className="shrink-0 text-[0.58rem] font-bold text-secondary-foreground">{recommendation.relevance}% match</span>
+                </div>
+                <h3 className="mt-2 text-xs font-extrabold leading-5">{recommendation.title}</h3>
+                <p className="mt-1 line-clamp-3 text-[0.68rem] leading-5 text-muted-foreground">{recommendation.summary}</p>
+                {(recommendation.provider || recommendation.duration || recommendation.schedule) && (
+                  <p className="mt-2 text-[0.6rem] leading-4 text-muted-foreground">
+                    {[recommendation.provider, recommendation.duration, recommendation.schedule].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+                <a
+                  href={recommendation.destinationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center text-[0.62rem] font-bold text-primary underline-offset-2 hover:underline"
+                  data-testid={`link-recommendation-${recommendation.source}-${recommendation.id}`}
+                >
+                  Open official details <ArrowUpRight className="ml-1 size-3" />
+                </a>
+              </article>
+            ))
+          ) : (
+            <p className="rounded-xl border border-dashed border-border p-3 text-xs leading-5 text-muted-foreground" data-testid="status-recommendations-empty">
+              No matching official items were returned for “{submittedQuery}”. Try a broader competency or topic.
+            </p>
+          )}
+          {response.catalogueStatus !== 'available' && (
+            <p className="text-[0.62rem] leading-5 text-muted-foreground" data-testid="status-recommendations-partial">
+              {response.catalogueStatus === 'unavailable'
+                ? 'Both official catalogues are unavailable right now; no placeholder recommendations are shown.'
+                : 'One official catalogue is unavailable; the results above only come from the source that responded.'}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
