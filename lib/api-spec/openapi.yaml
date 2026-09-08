@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: gemini
+    description: KARMA AI learning assistant operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /gemini/chat:
+    post:
+      operationId: sendGeminiChat
+      tags: [gemini]
+      summary: Ask KARMA AI a learning question
+      description: Sends a learning question and optional uploaded-material context to the Gemini-powered KARMA AI assistant.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeminiChatInput"
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeminiChatResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: AI provider error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +66,56 @@ components:
           type: string
       required:
         - status
+    GeminiChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+          minLength: 1
+      required:
+        - role
+        - content
+    GeminiChatInput:
+      type: object
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 12000
+        history:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/GeminiChatMessage"
+        materialText:
+          type: ["string", "null"]
+          maxLength: 50000
+        materialName:
+          type: ["string", "null"]
+          maxLength: 200
+      required:
+        - message
+    GeminiChatResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        model:
+          type: string
+        groundedInMaterial:
+          type: boolean
+      required:
+        - message
+        - model
+        - groundedInMaterial
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
 
