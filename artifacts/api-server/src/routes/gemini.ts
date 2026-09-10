@@ -109,17 +109,22 @@ router.post("/gemini/chat", async (req, res) => {
 
     const payload = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
-      error?: { message?: string };
+      error?: { message?: string; code?: number; status?: string };
     };
 
     if (!response.ok) {
+      const providerMessage = payload.error?.message ?? "Unknown provider error";
       req.log.error(
-        { status: response.status, providerMessage: payload.error?.message },
+        { status: response.status, providerMessage, providerError: payload.error },
         "Gemini request failed",
       );
-      res
-        .status(502)
-        .json({ error: "KARMA AI could not reach Gemini right now. Please try again." });
+      const userMessage =
+        response.status === 429
+          ? "Gemini rate limit reached. Please wait a moment and try again."
+          : response.status === 400
+            ? `Gemini rejected the request: ${providerMessage}`
+            : "KARMA AI could not reach Gemini right now. Please try again.";
+      res.status(response.status === 429 ? 429 : 502).json({ error: userMessage });
       return;
     }
 
@@ -129,6 +134,7 @@ router.post("/gemini/chat", async (req, res) => {
       .trim();
 
     if (!answer) {
+      req.log.warn({ payload }, "Gemini returned empty answer");
       res.status(502).json({ error: "Gemini returned an empty response. Please try again." });
       return;
     }
@@ -177,13 +183,19 @@ router.post("/gemini/chat-stream", async (req, res) => {
 
     if (!response.ok) {
       const payload = (await response.json()) as {
-        error?: { message?: string };
+        error?: { message?: string; code?: number; status?: string };
       };
       req.log.error(
-        { status: response.status, providerMessage: payload.error?.message },
+        { status: response.status, providerMessage: payload.error?.message, providerError: payload.error },
         "Gemini stream request failed",
       );
-      res.status(502).send("KARMA AI could not reach Gemini right now. Please try again.");
+      const userMessage =
+        response.status === 429
+          ? "Gemini rate limit reached. Please wait a moment and try again."
+          : response.status === 400
+            ? `Gemini rejected the request: ${payload.error?.message ?? "bad request"}`
+            : "KARMA AI could not reach Gemini right now. Please try again.";
+      res.status(response.status === 429 ? 429 : 502).send(userMessage);
       return;
     }
 
