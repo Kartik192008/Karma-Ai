@@ -7,6 +7,9 @@ const GEMINI_MODEL = "gemini-3.6-flash";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_STREAM_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent`;
 
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+
 const KARMA_SYSTEM_PROMPT = `You are KARMA AI, a precise and encouraging learning assistant for officials and learners working with India's Official Statistical System.
 
 Your role is to explain concepts clearly, connect technical ideas to real public-sector and statistical practice, and help users build competency in statistics, data, technology, digital governance, and professional skills. Prefer structured answers with short headings or bullets when useful. Be accurate and transparent: if the provided material does not contain enough information, say so and answer from general knowledge only when helpful. Never invent official policy, course availability, or iGOT Karmayogi links. You may suggest that a learner consult official MoSPI, NSSTA, or iGOT sources for authoritative details.
@@ -150,6 +153,167 @@ router.post("/gemini/chat", async (req, res) => {
     res.status(502).json({ error: "KARMA AI is temporarily unavailable. Please try again." });
   }
 });
+
+router.post("/chat", async (req, res) => {
+  const parsed = SendGeminiChatBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Please provide a valid learning question." });
+    return;
+  }
+
+  const provider = (req.body.provider as string | undefined)?.toLowerCase();
+  const model = (req.body.model as string | undefined) || GROQ_MODEL;
+
+  if (!provider) {
+    res.status(400).json({ error: "Missing provider. Choose 'gemini' or 'groq'." });
+    return;
+  }
+
+  if (provider === "gemini") {
+    return handleGemini(req, res, parsed.data, model || GEMINI_MODEL);
+  }
+
+  if (provider === "groq") {
+    return handleGroq(req, res, parsed.data, model);
+  }
+
+  res.status(400).json({ error: `Unsupported provider: ${provider}` });
+});
+
+async function handleGemini(req: any, res: any, data: any, model: string) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    res.status(503).json({ error: "KARMA AI is not configured with a Gemini key yet." });
+    return;
+  }
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  try {
+    const response = await fetch(`${endpoint}?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildGeminiPayload(data.history, data.message, data.materialText, data.materialName, data.images)),
+    });
+
+    const payload = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
+      error?: { message?: string; code?: number; status?: string };
+    };
+
+    if (!response.ok) {
+      const providerMessage = payload.error?.message ?? "Unknown provider error";
+      req.log.error(
+        { status: response.status, providerMessage, providerError: payload.error },
+        "Gemini request failed",
+      );
+      const userMessage =
+        response.status === 429
+          ? "Gemini rate limit reached. Please wait a moment and try again."
+          : response.status === 400
+            ? `Gemini rejected the request: ${providerMessage}`
+            : "KARMA AI could not reach Gemini right now. Please try again.";
+      res.status(response.status === 429 ? 429 : 502).json({ error: userMessage });
+      return;
+    }
+
+    const answer = payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? "")
+      .join("")
+      .trim();
+
+    if (!answer) {
+      req.log.warn({ payload }, "Gemini returned empty answer");
+      res.status(502).json({ error: "Gemini returned an empty response. Please try again." });
+      return;
+    }
+
+    const result = SendGeminiChatResponse.parse({
+      message: answer,
+      model,
+      groundedInMaterial: Boolean(data.materialText),
+    });
+    res.json(result);
+  } catch (error) {
+    req.log.error({ err: error }, "Unexpected Gemini request error");
+    res.status(502).json({ error: "KARMA AI is temporarily unavailable. Please try again." });
+  }
+}
+
+async function handleGroq(req: any, res: any, data: any, model: string) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    res.status(503).json({ error: "KARMA AI is not configured with a Groq key yet." });
+    return;
+  }
+
+  const messages: Array<{ role: string; content: string }> = [];
+  if (data.history?.length) {
+    for (const item of data.history) {
+      messages.push({ role: item.role === "assistant" ? "assistant" : "user", content: item.content });
+    }
+  }
+
+  const materialContext = data.materialText
+    ? `\n\nLearning material${data.materialName ? ` (${data.materialName})` : ""}:\n${data.materialText}`
+    : "";
+  messages.push({ role: "user", content: `${data.message}${materialContext}` });
+
+  try {
+    const response = await fetch(GROQ_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.35,
+        max_tokens: 8192,
+      }),
+    });
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+      error?: { message?: string; code?: number };
+    };
+
+    if (!response.ok) {
+      const providerMessage = payload.error?.message ?? "Unknown provider error";
+      req.log.error(
+        { status: response.status, providerMessage, providerError: payload.error },
+        "Groq request failed",
+      );
+      const userMessage =
+        response.status === 429
+          ? "Groq rate limit reached. Please wait a moment and try again."
+          : response.status === 400
+            ? `Groq rejected the request: ${providerMessage}`
+            : "KARMA AI could not reach Groq right now. Please try again.";
+      res.status(response.status === 429 ? 429 : 502).json({ error: userMessage });
+      return;
+    }
+
+    const answer = payload.choices?.[0]?.message?.content?.trim();
+
+    if (!answer) {
+      req.log.warn({ payload }, "Groq returned empty answer");
+      res.status(502).json({ error: "Groq returned an empty response. Please try again." });
+      return;
+    }
+
+    const result = SendGeminiChatResponse.parse({
+      message: answer,
+      model: `groq/${model}`,
+      groundedInMaterial: Boolean(data.materialText),
+    });
+    res.json(result);
+  } catch (error) {
+    req.log.error({ err: error }, "Unexpected Groq request error");
+    res.status(502).json({ error: "KARMA AI is temporarily unavailable. Please try again." });
+  }
+}
 
 router.post("/gemini/chat-stream", async (req, res) => {
   const parsed = SendGeminiChatBody.safeParse(req.body);

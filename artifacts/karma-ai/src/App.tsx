@@ -6,7 +6,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import {
   useGetLearningRecommendations,
-  useSendGeminiChat,
   type GeminiChatMessage,
   type LearningRecommendationsResponse,
 } from '@/lib/api-client-react';
@@ -268,7 +267,9 @@ function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [recommendationQuery, setRecommendationQuery] = useState('');
   const [submittedRecommendationQuery, setSubmittedRecommendationQuery] = useState('');
-  const sendChat = useSendGeminiChat();
+  const [provider, setProvider] = useState<'gemini' | 'groq'>('gemini');
+  const [model, setModel] = useState('gemini-2.5-flash');
+  const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recommendations = useGetLearningRecommendations(
@@ -284,7 +285,7 @@ function Chat() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, sendChat.isPending]);
+  }, [messages, isSending]);
 
   const handleFile = async (file?: File) => {
     if (!file) return;
@@ -326,23 +327,40 @@ function Chat() {
   const submitQuestion = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = message.trim();
-    if (!trimmed || sendChat.isPending) return;
+    if (!trimmed || isSending) return;
     setRequestError('');
     const history = messages.slice(-20).map(({ role, content }) => ({ role, content }));
     const userMessage: GeminiChatMessage = { role: 'user', content: trimmed };
     setMessages((current) => [...current, userMessage]);
     setMessage('');
-    sendChat.mutate(
-      { data: { message: trimmed, history, materialText: materialText || null, materialName: materialName || null } },
-      {
-        onSuccess: (response) => {
-          setMessages((current) => [...current, { role: 'assistant', content: response.message, groundedInMaterial: response.groundedInMaterial }]);
-        },
-        onError: (error) => {
-          setRequestError(error instanceof Error ? error.message : 'KARMA could not answer just now. Please try again.');
-        },
-      },
-    );
+    setIsSending(true);
+
+    const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+    fetch(`${apiBaseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: trimmed,
+        history,
+        materialText: materialText || null,
+        materialName: materialName || null,
+        provider,
+        model,
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'KARMA could not answer just now. Please try again.');
+        }
+        setMessages((current) => [...current, { role: 'assistant', content: data.message, groundedInMaterial: data.groundedInMaterial }]);
+      })
+      .catch((error) => {
+        setRequestError(error instanceof Error ? error.message : 'KARMA could not answer just now. Please try again.');
+      })
+      .finally(() => {
+        setIsSending(false);
+      });
   };
 
   const startFresh = () => {
@@ -368,6 +386,19 @@ function Chat() {
           <Link href="/" className="flex items-center gap-2.5" data-testid="link-chat-logo"><KarmaMark size="sm" /><span className="font-display text-xl tracking-[-0.03em]">KARMA</span></Link>
           <span className="hidden h-5 w-px bg-border sm:block" />
           <span className="hidden text-[0.64rem] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:block">Learning assistant</span>
+          <select
+            value={provider}
+            onChange={(event) => {
+              const next = event.target.value as 'gemini' | 'groq';
+              setProvider(next);
+              setModel(next === 'groq' ? 'llama-3.3-70b-versatile' : 'gemini-2.5-flash');
+            }}
+            className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+            data-testid="select-provider"
+          >
+            <option value="gemini">Gemini</option>
+            <option value="groq">Groq</option>
+          </select>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={startFresh} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-[0.66rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary" data-testid="button-new-conversation"><Plus className="size-3.5" /> <span className="hidden sm:inline">New conversation</span></button>
