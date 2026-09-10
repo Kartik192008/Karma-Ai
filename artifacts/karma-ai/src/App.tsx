@@ -461,7 +461,7 @@ function Chat() {
             ) : (
               <div className="flex-1 space-y-7 py-8 sm:py-12">
                 {messages.map((item, index) => <ChatMessage key={`${item.role}-${index}`} item={item} />)}
-                {sendChat.isPending && <TypingMessage />}
+                {isSending && <TypingMessage />}
                 {requestError && (
                   <div className="flex items-start gap-3 rounded-2xl border border-destructive/25 bg-destructive/5 p-4 text-sm text-destructive" role="alert" data-testid="status-chat-error">
                     <CircleHelp className="mt-0.5 size-4 shrink-0" />
@@ -475,7 +475,7 @@ function Chat() {
               {materialName && <div className="mb-2 flex items-center gap-2 px-3 text-[0.62rem] font-semibold text-primary"><Paperclip className="size-3.5" /> Answers can refer to {materialName}</div>}
               <form onSubmit={submitQuestion} className="relative rounded-2xl border border-border bg-card p-2 shadow-[0_12px_35px_hsl(218_34%_17%_/_0.07)] transition-colors focus-within:border-primary/45" data-testid="form-chat">
                 <textarea value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Ask KARMA about a concept, process, or skill…" rows={2} className="w-full resize-none bg-transparent px-3 py-2.5 pr-12 text-sm leading-6 outline-none placeholder:text-muted-foreground/70" aria-label="Your question" data-testid="input-chat-message" />
-                <button type="submit" disabled={!message.trim() || sendChat.isPending} className="absolute bottom-3 right-3 flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-35" aria-label="Send question" data-testid="button-send-message"><Send className="size-4" /></button>
+                <button type="submit" disabled={!message.trim() || isSending} className="absolute bottom-3 right-3 flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-35" aria-label="Send question" data-testid="button-send-message"><Send className="size-4" /></button>
               </form>
               <p className="mt-2 text-center text-[0.6rem] text-muted-foreground">KARMA can make mistakes. Use your official materials as the final source of truth.</p>
             </div>
