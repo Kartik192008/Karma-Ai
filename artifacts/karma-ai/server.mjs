@@ -37,7 +37,7 @@ app.get("/healthz", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.get("*", (req, res) => {
+app.use((req, res) => {
   res.sendFile(indexPath, (err) => {
     if (err) {
       console.error(`Failed to send ${indexPath}:`, err);
