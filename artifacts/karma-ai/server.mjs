@@ -1,54 +1,36 @@
 import express from "express";
-import { existsSync, createReadStream } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join, extname } from "node:path";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
-const rootDir = process.cwd();
+const distDir = join(process.cwd(), "dist", "public");
 
-const distDir = join(rootDir, "dist", "public");
-
-if (!existsSync(distDir)) {
-  console.error(`Static frontend directory not found: ${distDir}`);
+if (!existsSync(join(distDir, "index.html"))) {
+  console.error(`Frontend build output missing in: ${distDir}`);
+  process.exit(1);
 }
 
 app.use(express.static(distDir));
 
-app.get("/", (req, res) => {
-  const indexPath = join(distDir, "index.html");
-  if (!existsSync(indexPath)) {
-    console.error(`index.html not found at: ${indexPath}`);
-    return res.status(500).send("Frontend build output is missing.");
-  }
-  const stream = createReadStream(indexPath);
-  stream.pipe(res);
-  stream.on("error", () => {
-    if (!res.headersSent) {
-      res.status(500).end("Failed to load the application shell.");
-    }
-  });
+app.get("/healthz", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 app.get("*", (req, res) => {
-  const indexPath = join(distDir, "index.html");
-  if (!existsSync(indexPath)) {
-    console.error(`index.html not found at: ${indexPath}`);
-    return res.status(500).send("Frontend build output is missing.");
-  }
-  const stream = createReadStream(indexPath);
-  stream.pipe(res);
-  stream.on("error", () => {
-    if (!res.headersSent) {
-      res.status(500).end("Failed to load the application shell.");
+  res.sendFile(join(distDir, "index.html"), (err) => {
+    if (err) {
+      res.status(500).send("Failed to load the application shell.");
     }
   });
 });
 
-app.listen(port, () => {
+const server = app.listen(port, "0.0.0.0", () => {
   console.log(`Frontend server listening on port ${port}`);
   console.log(`Serving static files from: ${distDir}`);
+});
+
+server.on("error", (err) => {
+  console.error("Server error:", err);
+  process.exit(1);
 });
