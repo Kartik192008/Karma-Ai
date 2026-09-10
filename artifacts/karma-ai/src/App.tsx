@@ -10,6 +10,9 @@ import {
   type GeminiChatMessage,
   type LearningRecommendationsResponse,
 } from '@/lib/api-client-react';
+import { setBaseUrl } from '@/lib/api-client-react';
+
+setBaseUrl(import.meta.env.VITE_API_BASE_URL ?? null);
 import {
   ArrowUpRight,
   BookOpen,
