@@ -190,11 +190,15 @@ async function handleGemini(req: any, res: any, data: any, model: string) {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   try {
-    const response = await fetch(`${endpoint}?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildGeminiPayload(data.history, data.message, data.materialText, data.materialName, data.images)),
-    });
+    const response = await withTimeout(
+      fetch(`${endpoint}?key=${encodeURIComponent(apiKey)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildGeminiPayload(data.history, data.message, data.materialText, data.materialName, data.images)),
+      }),
+      30000,
+      "Gemini request",
+    );
 
     const payload = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
@@ -240,6 +244,13 @@ async function handleGemini(req: any, res: any, data: any, model: string) {
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]);
+}
+
 async function handleGroq(req: any, res: any, data: any, model: string) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -260,19 +271,23 @@ async function handleGroq(req: any, res: any, data: any, model: string) {
   messages.push({ role: "user", content: `${data.message}${materialContext}` });
 
   try {
-    const response = await fetch(GROQ_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.35,
-        max_tokens: 8192,
+    const response = await withTimeout(
+      fetch(GROQ_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.35,
+          max_tokens: 8192,
+        }),
       }),
-    });
+      30000,
+      "Groq request",
+    );
 
     const payload = (await response.json()) as {
       choices?: Array<{ message?: { content?: string } }>;

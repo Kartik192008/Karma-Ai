@@ -268,7 +268,7 @@ function Chat() {
   const [recommendationQuery, setRecommendationQuery] = useState('');
   const [submittedRecommendationQuery, setSubmittedRecommendationQuery] = useState('');
   const [provider, setProvider] = useState<'gemini' | 'groq'>('gemini');
-  const [model, setModel] = useState('gemini-2.5-flash');
+  const [model, setModel] = useState('gemini-3.6-flash');
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
