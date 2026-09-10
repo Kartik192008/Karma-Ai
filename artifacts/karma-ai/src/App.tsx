@@ -9,7 +9,7 @@ import {
   useSendGeminiChat,
   type GeminiChatMessage,
   type LearningRecommendationsResponse,
-} from '@workspace/api-client-react';
+} from '@/lib/api-client-react';
 import {
   ArrowUpRight,
   BookOpen,
