@@ -59,6 +59,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /mospi-recommendations:
+    get:
+      operationId: searchMospiDatasets
+      tags: [mospi]
+      summary: Search official MoSPI datasets
+      description: Searches the MoSPI Microdata Portal for datasets relevant to the query. Returns ranked official dataset metadata only.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Competency, topic, or learning goal to search MoSPI datasets for
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 200
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of dataset results
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+            default: 6
+      responses:
+        "200":
+          description: Official MoSPI dataset recommendations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MospiRecommendationsResponse"
+        "400":
+          description: Invalid query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: MoSPI provider error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /learning-recommendations:
     get:
       operationId: getLearningRecommendations
@@ -141,6 +184,17 @@ components:
         materialName:
           type: ["string", "null"]
           maxLength: 200
+        images:
+          type: array
+          maxItems: 1
+          items:
+            type: object
+            properties:
+              mimeType:
+                type: string
+              data:
+                type: string
+            required: []
       required:
         - message
     GeminiChatResponse:

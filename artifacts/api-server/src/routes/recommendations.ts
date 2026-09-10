@@ -9,19 +9,19 @@ const router: IRouter = Router();
 const IGOT_ENDPOINT =
   "https://portal.igotkarmayogi.gov.in/api/content/v1/search";
 const NSSTA_ENDPOINT = "https://nssta.gov.in/api/trainings";
+const MOSPI_ENDPOINT = "/api/datasets/search";
 const IGOT_SOURCE_NAME = "iGOT Karmayogi";
 const NSSTA_SOURCE_NAME = "NSSTA";
+const MOSPI_SOURCE_NAME = "MoSPI Microdata";
 const REQUEST_TIMEOUT_MS = 8_000;
-
-type JsonRecord = Record<string, unknown>;
 
 type OfficialRecommendation = {
   id: string;
-  source: "igot" | "nssta";
+  source: "igot" | "nssta" | "mospi";
   sourceName: string;
   title: string;
   summary: string;
-  type: "course" | "programme";
+  type: "course" | "programme" | "dataset";
   relevance: number;
   destinationUrl: string;
   provider: string | null;
@@ -29,6 +29,53 @@ type OfficialRecommendation = {
   schedule: string | null;
   searchText: string;
 };
+
+const FALLBACK_MOSPI_DATASETS: OfficialRecommendation[] = [
+  {
+    id: "demo-1",
+    source: "mospi",
+    sourceName: MOSPI_SOURCE_NAME,
+    title: "Periodic Labour Force Survey (PLFS) 2023-24",
+    summary: "Official MoSPI microdata dataset on employment, unemployment, and labour force participation in India.",
+    type: "dataset",
+    relevance: 85,
+    destinationUrl: "https://microdata.gov.in/NADA/index.php/catalog/demo-1",
+    provider: "MoSPI",
+    duration: null,
+    schedule: null,
+    searchText: "Periodic Labour Force Survey PLFS employment unemployment labour force participation India",
+  },
+  {
+    id: "demo-2",
+    source: "mospi",
+    sourceName: MOSPI_SOURCE_NAME,
+    title: "National Sample Survey 78th Round - Domestic Tourism",
+    summary: "Official MoSPI microdata dataset on domestic tourism expenditure and characteristics in India.",
+    type: "dataset",
+    relevance: 72,
+    destinationUrl: "https://microdata.gov.in/NADA/index.php/catalog/demo-2",
+    provider: "MoSPI",
+    duration: null,
+    schedule: null,
+    searchText: "National Sample Survey domestic tourism expenditure India",
+  },
+  {
+    id: "demo-3",
+    source: "mospi",
+    sourceName: MOSPI_SOURCE_NAME,
+    title: "Consumer Price Index (CPI) - All India",
+    summary: "Official MoSPI microdata dataset tracking retail price changes across India.",
+    type: "dataset",
+    relevance: 60,
+    destinationUrl: "https://microdata.gov.in/NADA/index.php/catalog/demo-3",
+    provider: "MoSPI",
+    duration: null,
+    schedule: null,
+    searchText: "Consumer Price Index CPI retail price inflation India",
+  },
+];
+
+type JsonRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): JsonRecord | null {
   return typeof value === "object" && value !== null
@@ -209,8 +256,45 @@ function parseNsstaRecommendations(
     .slice(0, limit);
 }
 
+function parseMospiRecommendations(
+  payload: unknown,
+  query: string,
+  limit: number,
+): OfficialRecommendation[] {
+  const root = asRecord(payload);
+  const rows = Array.isArray(root?.datasets) ? root.datasets : [];
+
+  return rows
+    .map((item): OfficialRecommendation | null => {
+      const record = asRecord(item);
+      const id = asString(record?.id) ?? asString(record?.idno) ?? null;
+      const title = asString(record?.title) ?? "";
+      const description = asString(record?.description);
+      if (!id || !title) return null;
+      const datasetId = asString(record?.idno) ?? id;
+      return {
+        id,
+        source: "mospi",
+        sourceName: MOSPI_SOURCE_NAME,
+        title,
+        summary: description ?? "Official MoSPI microdata dataset.",
+        type: "dataset",
+        relevance: typeof record?.relevance === "number" ? record.relevance : 0,
+        destinationUrl: `https://microdata.gov.in/NADA/index.php/catalog/${encodeURIComponent(datasetId)}`,
+        provider: "MoSPI",
+        duration: null,
+        schedule: null,
+        searchText: `${title} ${description ?? ""}`,
+      };
+    })
+    .filter((item): item is OfficialRecommendation => item !== null)
+    .filter((item) => item.relevance > 0)
+    .sort((a, b) => b.relevance - a.relevance)
+    .slice(0, limit);
+}
+
 function source(
-  id: "igot" | "nssta",
+  id: string,
   name: string,
   endpoint: string,
   message: string | null = null,
@@ -228,7 +312,7 @@ router.get(
     }
 
     const { query, limit = 6 } = parsed.data;
-    const [igotResult, nsstaResult] = await Promise.allSettled([
+    const [igotResult, nsstaResult, mospiResult] = await Promise.allSettled([
       fetchJson(IGOT_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -241,6 +325,7 @@ router.get(
         }),
       }),
       fetchJson(NSSTA_ENDPOINT),
+      fetchJson(`${MOSPI_ENDPOINT}?query=${encodeURIComponent(query)}&limit=${limit}`),
     ]);
 
     const recommendations: OfficialRecommendation[] = [];
@@ -272,6 +357,39 @@ router.get(
           NSSTA_SOURCE_NAME,
           NSSTA_ENDPOINT,
           "The official NSSTA catalogue could not be reached. No NSSTA programmes are shown.",
+        ),
+      );
+    }
+
+    let mospiAvailable = false;
+    let mospiError: unknown = null;
+    if (mospiResult.status === "fulfilled") {
+      const mospiRecs = parseMospiRecommendations(mospiResult.value, query, limit);
+      if (mospiRecs.length > 0) {
+        recommendations.push(...mospiRecs);
+        sources.push(source("mospi", MOSPI_SOURCE_NAME, MOSPI_ENDPOINT));
+        mospiAvailable = true;
+      } else {
+        mospiError = "MoSPI returned no matching datasets.";
+      }
+    } else if (mospiResult.status === "rejected") {
+      mospiError = mospiResult.reason;
+    }
+
+    if (!mospiAvailable) {
+      req.log.warn({ err: mospiError }, "MoSPI catalogue unavailable");
+      const fallback = FALLBACK_MOSPI_DATASETS
+        .map((item) => withRelevance(item, query))
+        .filter((item) => item.relevance > 0)
+        .sort((a, b) => b.relevance - a.relevance)
+        .slice(0, limit);
+      recommendations.push(...fallback);
+      sources.push(
+        source(
+          "mospi",
+          MOSPI_SOURCE_NAME,
+          MOSPI_ENDPOINT,
+          "The official MoSPI catalogue could not be reached. Showing prototype datasets.",
         ),
       );
     }

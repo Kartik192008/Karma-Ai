@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { GeminiChatInputImagesItem } from './geminiChatInputImagesItem';
 import type { GeminiChatMessage } from './geminiChatMessage';
 
 export interface GeminiChatInput {
@@ -25,4 +26,6 @@ export interface GeminiChatInput {
      * @nullable
      */
   materialName?: string | null;
+  /** @maxItems 1 */
+  images?: GeminiChatInputImagesItem[];
 }

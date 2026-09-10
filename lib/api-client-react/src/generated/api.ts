@@ -124,8 +124,15 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
-   return withQueryKey(query, queryOptions.queryKey);
+  return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
 export const getSendGeminiChatUrl = () => {
 
 
@@ -274,5 +281,12 @@ export function useGetLearningRecommendations<TData = Awaited<ReturnType<typeof 
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
-   return withQueryKey(query, queryOptions.queryKey);
+  return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+

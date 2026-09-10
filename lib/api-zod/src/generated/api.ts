@@ -30,6 +30,8 @@ export const sendGeminiChatBodyMaterialTextMax = 50000;
 
 export const sendGeminiChatBodyMaterialNameMax = 200;
 
+export const sendGeminiChatBodyImagesMax = 1;
+
 
 
 export const SendGeminiChatBody = zod.object({
@@ -39,7 +41,11 @@ export const SendGeminiChatBody = zod.object({
   "content": zod.string().min(1)
 })).max(sendGeminiChatBodyHistoryMax).optional(),
   "materialText": zod.string().max(sendGeminiChatBodyMaterialTextMax).nullish(),
-  "materialName": zod.string().max(sendGeminiChatBodyMaterialNameMax).nullish()
+  "materialName": zod.string().max(sendGeminiChatBodyMaterialNameMax).nullish(),
+  "images": zod.array(zod.object({
+  "mimeType": zod.string().optional(),
+  "data": zod.string().optional()
+})).max(sendGeminiChatBodyImagesMax).optional()
 })
 
 export const SendGeminiChatResponse = zod.object({

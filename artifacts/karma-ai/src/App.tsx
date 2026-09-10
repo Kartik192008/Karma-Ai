@@ -42,6 +42,35 @@ import {
 const queryClient = new QueryClient();
 type ChatMessageItem = GeminiChatMessage & { groundedInMaterial?: boolean };
 
+const ALLOWED_EXTENSIONS = new Set(['txt', 'md', 'csv', 'json', 'html']);
+const ALLOWED_MIME_TYPES = new Set([
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/json',
+  'text/html',
+  'text/css',
+  'text/javascript',
+  'application/javascript',
+  'text/xml',
+  'application/xml',
+]);
+
+function isTextFile(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (!extension || !ALLOWED_EXTENSIONS.has(extension)) {
+    return false;
+  }
+  if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+    return false;
+  }
+  return true;
+}
+
+function unsupportedFileMessage(file: File) {
+  return `${file.name} does not appear to be a supported text-based file. Please use TXT, MD, CSV, JSON, or HTML.`;
+}
+
 function Home() {
   const [, setLocation] = useLocation();
 
@@ -163,10 +192,10 @@ function Home() {
 }
 
 function KarmaMark({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const imageSize = size === 'md' ? 36 : 20;
   return (
-    <span className={`relative inline-flex shrink-0 items-center justify-center rounded-full bg-primary ${size === 'md' ? 'size-9' : 'size-5'}`} aria-hidden="true">
-      <span className={`rounded-full border border-secondary ${size === 'md' ? 'size-4' : 'size-2.5'}`} />
-      <span className={`absolute rounded-full bg-secondary ${size === 'md' ? 'size-1.5' : 'size-1'}`} />
+    <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden ${size === 'md' ? 'size-9' : 'size-5'}`} aria-hidden="true">
+      <img src="/logo.jpeg" alt="KARMA AI" width={imageSize} height={imageSize} className="object-cover" />
     </span>
   );
 }
@@ -236,9 +265,9 @@ function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [recommendationQuery, setRecommendationQuery] = useState('');
   const [submittedRecommendationQuery, setSubmittedRecommendationQuery] = useState('');
+  const sendChat = useSendGeminiChat();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const sendChat = useSendGeminiChat();
   const recommendations = useGetLearningRecommendations(
     { query: submittedRecommendationQuery || 'statistics', limit: 6 },
     {
@@ -257,9 +286,8 @@ function Chat() {
   const handleFile = async (file?: File) => {
     if (!file) return;
     setFileError('');
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    if (!['txt', 'md', 'csv', 'json', 'html'].includes(extension ?? '')) {
-      setFileError('Please choose a text-based file: TXT, MD, CSV, JSON, or HTML.');
+    if (!isTextFile(file)) {
+      setFileError(unsupportedFileMessage(file));
       return;
     }
     setIsReading(true);
@@ -276,6 +304,20 @@ function Chat() {
     } finally {
       setIsReading(false);
     }
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setFileError('');
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    await handleFile(file);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
   };
 
   const submitQuestion = (event: FormEvent<HTMLFormElement>) => {
@@ -303,6 +345,8 @@ function Chat() {
   const startFresh = () => {
     setMessages([]);
     setMessage('');
+    setMaterialText('');
+    setMaterialName('');
     setRequestError('');
   };
 
@@ -434,7 +478,7 @@ function OfficialRecommendations({
         </div>
         <BookOpen className="mt-1 size-4 shrink-0 text-primary" aria-hidden="true" />
       </div>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">Search live metadata from iGOT Karmayogi and NSSTA. KARMA never fills gaps with made-up courses.</p>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">Search live metadata from iGOT Karmayogi, NSSTA, and MoSPI. KARMA never fills gaps with made-up courses or datasets.</p>
       <form onSubmit={onSubmit} className="mt-4 flex gap-2" data-testid="form-recommendations">
         <label htmlFor="recommendation-query" className="sr-only">Learning topic</label>
         <input
@@ -505,8 +549,8 @@ function OfficialRecommendations({
           {response.catalogueStatus !== 'available' && (
             <p className="text-[0.62rem] leading-5 text-muted-foreground" data-testid="status-recommendations-partial">
               {response.catalogueStatus === 'unavailable'
-                ? 'Both official catalogues are unavailable right now; no placeholder recommendations are shown.'
-                : 'One official catalogue is unavailable; the results above only come from the source that responded.'}
+                ? 'All official catalogues are unavailable right now; showing prototype datasets where available.'
+                : 'One or more official catalogues are unavailable; the results above only come from the sources that responded.'}
             </p>
           )}
         </div>

@@ -23,6 +23,11 @@ export interface GeminiChatMessage {
   content: string;
 }
 
+export type GeminiChatInputImagesItem = {
+  mimeType?: string;
+  data?: string;
+};
+
 export interface GeminiChatInput {
   /**
      * @minLength 1
@@ -41,6 +46,8 @@ export interface GeminiChatInput {
      * @nullable
      */
   materialName?: string | null;
+  /** @maxItems 1 */
+  images?: GeminiChatInputImagesItem[];
 }
 
 export interface GeminiChatResponse {

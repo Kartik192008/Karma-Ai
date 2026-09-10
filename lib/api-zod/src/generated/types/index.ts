@@ -8,6 +8,7 @@
 
 export * from './errorResponse';
 export * from './geminiChatInput';
+export * from './geminiChatInputImagesItem';
 export * from './geminiChatMessage';
 export * from './geminiChatMessageRole';
 export * from './geminiChatResponse';
