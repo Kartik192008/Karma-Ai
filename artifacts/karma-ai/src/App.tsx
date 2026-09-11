@@ -342,6 +342,14 @@ function Chat() {
     event.preventDefault();
     const trimmed = message.trim();
     if (!trimmed || isSending) return;
+
+    const quizIntent = /quiz|generate.*quiz|create.*quiz|practice.*questions/i.test(trimmed);
+    if (quizIntent && materialText) {
+      handleGenerateQuiz();
+      setMessage('');
+      return;
+    }
+
     setRequestError('');
     const history = messages.slice(-20).map(({ role, content }) => ({ role, content }));
     const userMessage: GeminiChatMessage = { role: 'user', content: trimmed };
