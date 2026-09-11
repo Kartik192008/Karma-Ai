@@ -552,6 +552,26 @@ function Chat() {
                   <span className="mt-1 text-xs leading-5 text-muted-foreground">TXT, MD, CSV, JSON or HTML. Read locally, then shared as context.</span>
                 </button>
               )}
+              {!materialName && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/mospi-plfs-sample.csv');
+                      const text = await response.text();
+                      setMaterialText(text.slice(0, 50000));
+                      setMaterialName('mospi-plfs-sample.csv');
+                    } catch (error) {
+                      setFileError('Could not load demo file. Please try uploading manually.');
+                    }
+                  }}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                  data-testid="button-load-demo-data"
+                >
+                  <FileText className="size-3.5" />
+                  Load demo PLFS data
+                </button>
+              )}
             </div>
             {fileError && <p className="mt-3 text-xs leading-5 text-destructive" role="alert" data-testid="status-file-error">{fileError}</p>}
             <div className="mt-5 border-t border-border pt-5">

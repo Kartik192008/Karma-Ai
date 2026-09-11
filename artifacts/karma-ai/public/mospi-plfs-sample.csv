@@ -1,0 +1,21 @@
+id,household_id,state,district,rural_urban,age,sex,education_level,employment_status,unemployment_reason,monthly_income,wage_rate,sector,usual_activity,current_activity,looking_for_work,available_for_work,migration_status,years_of_experience
+1,HH-001,Delhi,Central Delhi,Urban,28,Male,Graduate,Employed,NA,45000,500,Services,Software Developer,Software Developer,No,No,No,5
+2,HH-002,Uttar Pradesh,Lucknow,Rural,35,Female,Below Primary,Unemployed,No job available,0,0,Agriculture,Farm Worker,NA,Yes,Yes,No,10
+3,HH-003,Maharashtra,Mumbai,Urban,22,Male,Post Graduate,Employed,NA,65000,800,Services,Research Analyst,Research Analyst,No,No,No,1
+4,HH-004,Tamil Nadu,Chennai,Urban,40,Female,Secondary,Employed,NA,32000,350,Manufacturing,Supervisor,Supervisor,No,No,No,15
+5,HH-005,Karnataka,Bangalore,Urban,26,Male,Graduate,Employed,NA,55000,600,Services,Data Analyst,Data Analyst,No,No,No,3
+6,HH-006,Rajasthan,Jaipur,Rural,30,Female,Higher Secondary,Unemployed,No job available,0,0,NA,Home Maker,NA,Yes,Yes,No,8
+7,HH-007,Gujarat,Ahmedabad,Urban,45,Male,Post Graduate,Employed,NA,85000,1000,Services,Manager,Manager,No,No,No,20
+8,HH-008,West Bengal,Kolkata,Urban,24,Female,Graduate,Employed,NA,38000,400,Services,Content Writer,Content Writer,No,No,No,2
+9,HH-009,Punjab,Ludhiana,Rural,38,Male,Secondary,Employed,NA,28000,300,Manufacturing,Technician,Technician,No,No,No,12
+10,HH-010,Kerala,Thiruvananthapuram,Urban,29,Female,Post Graduate,Employed,NA,48000,500,Services,Teacher,Teacher,No,No,No,6
+11,HH-011,Bihar,Patna,Rural,32,Male,Below Primary,Unemployed,Seasonal work,5000,150,Agriculture,Farm Worker,NA,Yes,Yes,No,18
+12,HH-012,Haryana,Faridabad,Urban,27,Female,Graduate,Employed,NA,42000,450,Services,HR Executive,HR Executive,No,No,No,4
+13,HH-013,Madhya Pradesh,Bhopal,Rural,41,Male,Secondary,Employed,NA,25000,275,Manufacturing,Fitter,Fitter,No,No,No,16
+14,HH-014,Assam,Guwahati,Urban,23,Female,Higher Secondary,Employed,NA,31000,350,Services,Customer Support,Customer Support,No,No,No,1
+15,HH-015,Odisha,Bhubaneswar,Rural,36,Male,Graduate,Unemployed,No job available,0,0,NA,Fisherman,NA,Yes,Yes,No,14
+16,HH-016,Goa,Panaji,Urban,31,Female,Post Graduate,Employed,NA,72000,800,Services,Consultant,Consultant,No,No,No,8
+17,HH-017,Jharkhand,Ranchi,Rural,39,Male,Secondary,Employed,NA,22000,250,Construction,Mason,Mason,No,No,No,20
+18,HH-018,Chhattisgarh,Raipur,Urban,25,Female,Graduate,Employed,NA,40000,450,Services,Accountant,Accountant,No,No,No,3
+19,HH-019,Himachal Pradesh,Shimla,Rural,34,Male,Higher Secondary,Employed,NA,26000,275,Agriculture,Farm Worker,Farm Worker,No,No,No,11
+20,HH-020,Uttarakhand,Dehradun,Urban,28,Male,Graduate,Employed,NA,50000,550,Services,Software Tester,Software Tester,No,No,No,5

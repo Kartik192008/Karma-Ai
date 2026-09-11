@@ -175,48 +175,34 @@ router.post("/chat", async (req, res) => {
     return;
   }
 
-  const providers = requestedProvider === "gemini" ? ["gemini", "groq", "aiml", "huggingface"] : requestedProvider === "groq" ? ["groq", "gemini", "aiml", "huggingface"] : requestedProvider === "huggingface" ? ["huggingface", "gemini", "groq", "aiml"] : ["aiml", "gemini", "groq", "huggingface"];
-  const models = requestedProvider === "gemini" ? [model || GEMINI_MODEL, GROQ_MODEL, AIML_MODEL, HF_MODEL] : requestedProvider === "groq" ? [model, GEMINI_MODEL, AIML_MODEL, HF_MODEL] : requestedProvider === "huggingface" ? [model || HF_MODEL, GEMINI_MODEL, GROQ_MODEL, AIML_MODEL] : [model || AIML_MODEL, GEMINI_MODEL, GROQ_MODEL, HF_MODEL];
+  const requestedModel = model || (requestedProvider === "gemini" ? GEMINI_MODEL : requestedProvider === "groq" ? GROQ_MODEL : requestedProvider === "huggingface" ? HF_MODEL : AIML_MODEL);
 
-  let lastError: { status: number; message: string } | null = null;
-
-  for (let i = 0; i < providers.length; i++) {
-    const provider = providers[i];
-    const providerModel = models[i] || (provider === "gemini" ? GEMINI_MODEL : GROQ_MODEL);
-
-    try {
-      let result: { message: string; model: string };
-      if (provider === "gemini") {
-        result = await handleGemini(req, parsed.data, providerModel);
-      } else if (provider === "groq") {
-        result = await handleGroq(req, parsed.data, providerModel);
-      } else if (provider === "huggingface") {
-        result = await handleHuggingFace(req, parsed.data, providerModel);
-      } else {
-        result = await handleAiml(req, parsed.data, providerModel);
-      }
-      const data = SendGeminiChatResponse.parse({
-        message: result.message,
-        model: result.model,
-        groundedInMaterial: Boolean(parsed.data.materialText),
-        provider,
-      });
-      res.json(data);
-      return;
-    } catch (error) {
-      const status = error instanceof Error && error.message.includes("timed out") ? 504 : 502;
-      lastError = {
-        status,
-        message: error instanceof Error ? error.message : "KARMA AI is temporarily unavailable. Please try again.",
-      };
-      req.log.warn(
-        { err: error, provider, fallback: i < providers.length - 1 },
-        "Provider failed, attempting fallback",
-      );
+  try {
+    let result: { message: string; model: string };
+    if (requestedProvider === "gemini") {
+      result = await handleGemini(req, parsed.data, requestedModel);
+    } else if (requestedProvider === "groq") {
+      result = await handleGroq(req, parsed.data, requestedModel);
+    } else if (requestedProvider === "huggingface") {
+      result = await handleHuggingFace(req, parsed.data, requestedModel);
+    } else {
+      result = await handleAiml(req, parsed.data, requestedModel);
     }
+    const data = SendGeminiChatResponse.parse({
+      message: result.message,
+      model: result.model,
+      groundedInMaterial: Boolean(parsed.data.materialText),
+      provider: requestedProvider,
+    });
+    res.json(data);
+  } catch (error) {
+    const status = error instanceof Error && error.message.includes("timed out") ? 504 : 502;
+    req.log.warn(
+      { err: error, provider: requestedProvider },
+      "Provider request failed",
+    );
+    res.status(status).json({ error: error instanceof Error ? error.message : "KARMA AI is temporarily unavailable. Please try again." });
   }
-
-  res.status(lastError?.status ?? 502).json({ error: lastError?.message ?? "KARMA AI is temporarily unavailable. Please try again." });
 });
 
 async function handleGemini(req: any, data: any, model: string): Promise<{ message: string; model: string }> {
