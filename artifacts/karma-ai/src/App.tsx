@@ -271,7 +271,7 @@ function Chat() {
   const [recommendationQuery, setRecommendationQuery] = useState('');
   const [submittedRecommendationQuery, setSubmittedRecommendationQuery] = useState('');
   const [provider, setProvider] = useState<'gemini' | 'groq' | 'aiml' | 'huggingface'>('gemini');
-  const [model, setModel] = useState('gemini-2.5-flash');
+  const [model, setModel] = useState('gemini-3.6-flash');
   const [isSending, setIsSending] = useState(false);
   const [quiz, setQuiz] = useState<QuizGenerateResponse | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
@@ -506,7 +506,7 @@ function Chat() {
             onChange={(event) => {
               const next = event.target.value as 'gemini' | 'groq' | 'aiml' | 'huggingface';
               setProvider(next);
-              setModel(next === 'groq' ? 'llama-3.1-70b-versatile' : next === 'aiml' ? 'mistralai/mistral-7b-instruct' : next === 'huggingface' ? 'google/gemma-2-9b-it' : 'gemini-2.5-flash');
+               setModel(next === 'groq' ? 'llama-3.1-70b-versatile' : next === 'aiml' ? 'mistralai/mistral-7b-instruct' : next === 'huggingface' ? 'google/gemma-2-9b-it' : 'gemini-3.6-flash');
             }}
             className="rounded-md border border-border bg-background px-2 py-1 text-xs"
             data-testid="select-provider"
