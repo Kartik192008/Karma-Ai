@@ -6,8 +6,10 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import {
   useGetLearningRecommendations,
+  useGenerateQuiz,
   type GeminiChatMessage,
   type LearningRecommendationsResponse,
+  type QuizGenerateResponse,
 } from '@/lib/api-client-react';
 import { setBaseUrl } from '@/lib/api-client-react';
 
@@ -32,6 +34,7 @@ import {
   Sparkles,
   Target,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import {
   Link,
@@ -267,9 +270,19 @@ function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [recommendationQuery, setRecommendationQuery] = useState('');
   const [submittedRecommendationQuery, setSubmittedRecommendationQuery] = useState('');
-  const [provider, setProvider] = useState<'gemini' | 'groq'>('gemini');
-  const [model, setModel] = useState('gemini-3.6-flash');
+  const [provider, setProvider] = useState<'gemini' | 'groq' | 'aiml' | 'huggingface'>('gemini');
+  const [model, setModel] = useState('gemini-2.5-flash');
   const [isSending, setIsSending] = useState(false);
+  const [quiz, setQuiz] = useState<QuizGenerateResponse | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizError, setQuizError] = useState('');
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [mospiQuery, setMospiQuery] = useState('');
+  const [mospiResults, setMospiResults] = useState<Array<{ id: string; title: string; description: string | null }>>([]);
+  const [mospiLoading, setMospiLoading] = useState(false);
+  const [mospiError, setMospiError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recommendations = useGetLearningRecommendations(
@@ -282,6 +295,7 @@ function Chat() {
       },
     },
   );
+  const generateQuizMutation = useGenerateQuiz();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -379,6 +393,107 @@ function Chat() {
     }
   };
 
+  const handleGenerateQuiz = () => {
+    setQuizError('');
+    setQuizSubmitted(false);
+    setQuizAnswers({});
+    setIsGeneratingQuiz(true);
+    generateQuizMutation.mutate(
+      { data: {
+        materialText: materialText || null,
+        materialName: materialName || null,
+        message: message.trim() || 'Generate a quiz based on the attached material',
+        provider,
+        model,
+      }},
+      {
+        onSuccess: (data) => {
+          setQuiz(data);
+          setQuizOpen(true);
+        },
+        onError: (error) => {
+          setQuizError(error instanceof Error ? error.message : 'Could not generate quiz. Please try again.');
+        },
+        onSettled: () => {
+          setIsGeneratingQuiz(false);
+        },
+      },
+    );
+  };
+
+  const handleQuizAnswer = (questionId: number, optionIndex: number) => {
+    setQuizAnswers((current) => ({ ...current, [questionId]: optionIndex }));
+  };
+
+  const handleQuizSubmit = () => {
+    setQuizSubmitted(true);
+  };
+
+  const handleQuizClose = () => {
+    setQuizOpen(false);
+    setQuiz(null);
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    setQuizError('');
+  };
+
+  const quizScore = quiz
+    ? quiz.quiz.questions.reduce((acc, q) => (quizAnswers[q.id] === q.correctIndex ? acc + 1 : acc), 0)
+    : 0;
+
+  const searchMospiDatasets = async () => {
+    const trimmed = mospiQuery.trim();
+    if (trimmed.length < 2) return;
+    setMospiLoading(true);
+    setMospiError('');
+    try {
+      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+      const response = await fetch(`${apiBaseUrl}/api/datasets/search?query=${encodeURIComponent(trimmed)}&limit=6`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'MoSPI search failed');
+      }
+      setMospiResults(data.datasets || []);
+    } catch (error) {
+      setMospiError(error instanceof Error ? error.message : 'Could not search MoSPI datasets.');
+    } finally {
+      setMospiLoading(false);
+    }
+  };
+
+  const loadMospiDataset = async (datasetId: string, title: string) => {
+    setMospiError('');
+    setMospiLoading(true);
+    try {
+      const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+      const response = await fetch(`${apiBaseUrl}/api/datasets/${encodeURIComponent(datasetId)}/fileslist`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not load dataset');
+      }
+      const files = Array.isArray(data.files) ? data.files : [];
+      if (files.length === 0) {
+        throw new Error('No files found in this dataset');
+      }
+      const firstFile = files[0];
+      if (!firstFile.base64) {
+        throw new Error('File data not available');
+      }
+      const binaryString = atob(firstFile.base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const text = new TextDecoder().decode(bytes);
+      setMaterialText(text.slice(0, 50000));
+      setMaterialName(firstFile.name || title);
+    } catch (error) {
+      setMospiError(error instanceof Error ? error.message : 'Could not load dataset. Try again.');
+    } finally {
+      setMospiLoading(false);
+    }
+  };
+
   return (
     <div className="grain flex min-h-[100dvh] flex-col bg-background text-foreground">
       <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-border bg-card/70 px-4 backdrop-blur-md sm:px-7">
@@ -389,15 +504,17 @@ function Chat() {
           <select
             value={provider}
             onChange={(event) => {
-              const next = event.target.value as 'gemini' | 'groq';
+              const next = event.target.value as 'gemini' | 'groq' | 'aiml' | 'huggingface';
               setProvider(next);
-              setModel(next === 'groq' ? 'llama-3.3-70b-versatile' : 'gemini-2.5-flash');
+              setModel(next === 'groq' ? 'llama-3.1-70b-versatile' : next === 'aiml' ? 'mistralai/mistral-7b-instruct' : next === 'huggingface' ? 'google/gemma-2-9b-it' : 'gemini-2.5-flash');
             }}
             className="rounded-md border border-border bg-background px-2 py-1 text-xs"
             data-testid="select-provider"
           >
             <option value="gemini">Gemini</option>
             <option value="groq">Groq</option>
+            <option value="aiml">AIML Mistral</option>
+            <option value="huggingface">HuggingFace</option>
           </select>
         </div>
         <div className="flex items-center gap-2">
@@ -437,6 +554,53 @@ function Chat() {
               )}
             </div>
             {fileError && <p className="mt-3 text-xs leading-5 text-destructive" role="alert" data-testid="status-file-error">{fileError}</p>}
+            <div className="mt-5 border-t border-border pt-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-mono-label text-[0.59rem] font-medium uppercase text-primary">MoSPI datasets</p>
+                  <h3 className="mt-1 text-sm font-extrabold tracking-[-0.03em]">Browse official data</h3>
+                </div>
+                <Landmark className="size-4 text-primary" />
+              </div>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">Search MoSPI microdata surveys and attach one for analysis.</p>
+              <form onSubmit={(e) => { e.preventDefault(); void searchMospiDatasets(); }} className="mt-3 flex gap-2" data-testid="form-mospi-search">
+                <input
+                  value={mospiQuery}
+                  onChange={(event) => setMospiQuery(event.target.value)}
+                  placeholder="e.g. labour force survey"
+                  maxLength={200}
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary/50"
+                  data-testid="input-mospi-query"
+                />
+                <button
+                  type="submit"
+                  disabled={mospiQuery.trim().length < 2 || mospiLoading}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Search MoSPI datasets"
+                  data-testid="button-search-mospi"
+                >
+                  <Search className="size-3.5" />
+                </button>
+              </form>
+              {mospiLoading && <p className="mt-2 text-xs text-muted-foreground" role="status" data-testid="status-mospi-loading">Searching MoSPI catalogue…</p>}
+              {mospiError && <p className="mt-2 text-xs leading-5 text-destructive" role="alert" data-testid="status-mospi-error">{mospiError}</p>}
+              {mospiResults.length > 0 && (
+                <div className="mt-3 space-y-2" data-testid="mospi-results">
+                  {mospiResults.map((dataset) => (
+                    <button
+                      key={dataset.id}
+                      type="button"
+                      onClick={() => loadMospiDataset(dataset.id, dataset.title)}
+                      disabled={mospiLoading}
+                      className="w-full rounded-xl border border-border bg-background p-3 text-left transition-colors hover:border-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <p className="text-xs font-extrabold leading-5">{dataset.title}</p>
+                      {dataset.description && <p className="mt-1 line-clamp-2 text-[0.68rem] leading-5 text-muted-foreground">{dataset.description}</p>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <OfficialRecommendations
               query={recommendationQuery}
               submittedQuery={submittedRecommendationQuery}
@@ -474,13 +638,148 @@ function Chat() {
             <div className="sticky bottom-0 mt-auto bg-gradient-to-t from-background via-background to-transparent pb-5 pt-5 sm:pb-8">
               {materialName && <div className="mb-2 flex items-center gap-2 px-3 text-[0.62rem] font-semibold text-primary"><Paperclip className="size-3.5" /> Answers can refer to {materialName}</div>}
               <form onSubmit={submitQuestion} className="relative rounded-2xl border border-border bg-card p-2 shadow-[0_12px_35px_hsl(218_34%_17%_/_0.07)] transition-colors focus-within:border-primary/45" data-testid="form-chat">
-                <textarea value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Ask KARMA about a concept, process, or skill…" rows={2} className="w-full resize-none bg-transparent px-3 py-2.5 pr-12 text-sm leading-6 outline-none placeholder:text-muted-foreground/70" aria-label="Your question" data-testid="input-chat-message" />
-                <button type="submit" disabled={!message.trim() || isSending} className="absolute bottom-3 right-3 flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-35" aria-label="Send question" data-testid="button-send-message"><Send className="size-4" /></button>
+                <textarea value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="Ask KARMA about a concept, process, or skill…" rows={2} className="w-full resize-none bg-transparent px-3 py-2.5 pr-24 text-sm leading-6 outline-none placeholder:text-muted-foreground/70" aria-label="Your question" data-testid="input-chat-message" />
+                <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
+                  <button type="button" onClick={handleGenerateQuiz} disabled={isGeneratingQuiz || (!materialText && !message.trim())} className="flex size-9 items-center justify-center rounded-xl bg-accent text-primary transition-all hover:bg-accent/70 disabled:cursor-not-allowed disabled:opacity-35" aria-label="Generate quiz" data-testid="button-generate-quiz" title="Generate quiz from material">
+                    {isGeneratingQuiz ? <div className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /> : <BrainCircuit className="size-4" />}
+                  </button>
+                  <button type="submit" disabled={!message.trim() || isSending} className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-35" aria-label="Send question" data-testid="button-send-message"><Send className="size-4" /></button>
+                </div>
               </form>
+              {quizError && <p className="mt-2 text-xs text-destructive" role="alert" data-testid="status-quiz-error">{quizError}</p>}
               <p className="mt-2 text-center text-[0.6rem] text-muted-foreground">KARMA can make mistakes. Use your official materials as the final source of truth.</p>
             </div>
           </div>
         </main>
+      </div>
+      <QuizModal
+        quiz={quiz}
+        open={quizOpen}
+        onClose={handleQuizClose}
+        answers={quizAnswers}
+        onAnswer={handleQuizAnswer}
+        submitted={quizSubmitted}
+        onSubmit={handleQuizSubmit}
+        score={quizScore}
+      />
+    </div>
+  );
+}
+
+function QuizModal({ quiz, open, onClose, answers, onAnswer, submitted, onSubmit, score }: {
+  quiz: QuizGenerateResponse | null;
+  open: boolean;
+  onClose: () => void;
+  answers: Record<number, number>;
+  onAnswer: (questionId: number, optionIndex: number) => void;
+  submitted: boolean;
+  onSubmit: () => void;
+  score: number;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (open) {
+      setCurrentIndex(0);
+    }
+  }, [open]);
+
+  if (!open || !quiz) return null;
+
+  const question = quiz.quiz.questions[currentIndex];
+  const total = quiz.quiz.questions.length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-[640px] max-h-[85vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 flex items-center justify-between border-b border-border bg-card px-5 py-4 backdrop-blur-md">
+          <div>
+            <h2 className="font-display text-lg font-extrabold tracking-[-0.03em]">{quiz.quiz.title}</h2>
+            <p className="text-xs text-muted-foreground">Question {currentIndex + 1} of {total}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-primary" aria-label="Close quiz"><X className="size-4" /></button>
+        </div>
+
+        <div className="p-5">
+          {question && (
+            <div>
+              <div className="mb-4">
+                <p className="text-sm font-extrabold leading-7">{question.question}</p>
+              </div>
+              <div className="space-y-2.5">
+                {question.options.map((option, index) => {
+                  const isSelected = answers[question.id] === index;
+                  const isCorrect = index === question.correctIndex;
+                  const showResult = submitted;
+
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => !submitted && onAnswer(question.id, index)}
+                      disabled={submitted}
+                      className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
+                        showResult && isCorrect
+                          ? 'border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400'
+                          : showResult && isSelected && !isCorrect
+                            ? 'border-destructive/50 bg-destructive/10 text-destructive'
+                            : isSelected
+                              ? 'border-primary bg-accent'
+                              : 'border-border bg-background hover:border-primary/30'
+                      } ${submitted ? 'cursor-default' : 'cursor-pointer'}`}
+                    >
+                      <span className="mr-2 inline-flex size-5 items-center justify-center rounded-full border border-current text-xs font-bold">
+                        {String.fromCharCode(65 + index)}
+                      </span>
+                      {option}
+                      {showResult && isCorrect && <Check className="ml-auto size-4 text-green-600" />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {submitted && question.explanation && (
+                <div className="mt-4 rounded-xl border border-primary/20 bg-accent/50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Explanation</p>
+                  <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
+                </div>
+              )}
+
+              <div className="mt-6 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+                  disabled={currentIndex === 0}
+                  className="rounded-lg border border-border px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+
+                <span className="text-xs text-muted-foreground">
+                  {submitted && `${score} / ${total} correct`}
+                </span>
+
+                {currentIndex < total - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentIndex((i) => Math.min(total - 1, i + 1))}
+                    className="rounded-lg bg-primary px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-primary-foreground"
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={submitted ? onClose : onSubmit}
+                    className="rounded-lg bg-secondary px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-secondary-foreground"
+                  >
+                    {submitted ? 'Finish' : 'Submit Quiz'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

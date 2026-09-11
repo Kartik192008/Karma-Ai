@@ -240,7 +240,7 @@ router.get("/datasets/:id/files/:filename/download", async (req, res) => {
 
     res.setHeader("Content-Type", "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
-    downloadResponse.body.pipe(res);
+    (downloadResponse.body as any).pipe(res);
   } catch {
     res.status(502).json({ error: "MoSPI file download failed. Please try again." });
   }

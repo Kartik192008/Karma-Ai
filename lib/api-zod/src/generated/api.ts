@@ -45,13 +45,81 @@ export const SendGeminiChatBody = zod.object({
   "images": zod.array(zod.object({
   "mimeType": zod.string().optional(),
   "data": zod.string().optional()
-})).max(sendGeminiChatBodyImagesMax).optional()
+})).max(sendGeminiChatBodyImagesMax).optional(),
+  "provider": zod.string().optional(),
+  "model": zod.string().optional()
 })
 
 export const SendGeminiChatResponse = zod.object({
   "message": zod.string(),
   "model": zod.string(),
-  "groundedInMaterial": zod.boolean()
+  "groundedInMaterial": zod.boolean(),
+  "provider": zod.string().optional()
+})
+
+
+/**
+ * Searches the MoSPI Microdata Portal for datasets relevant to the query. Returns ranked official dataset metadata only.
+ * @summary Search official MoSPI datasets
+ */
+export const searchMospiDatasetsQueryQueryMin = 2;
+export const searchMospiDatasetsQueryQueryMax = 200;
+
+export const searchMospiDatasetsQueryLimitDefault = 6;
+export const searchMospiDatasetsQueryLimitMax = 12;
+
+
+
+export const SearchMospiDatasetsQueryParams = zod.object({
+  "query": zod.coerce.string().min(searchMospiDatasetsQueryQueryMin).max(searchMospiDatasetsQueryQueryMax).describe('Competency, topic, or learning goal to search MoSPI datasets for'),
+  "limit": zod.coerce.number().int().min(1).max(searchMospiDatasetsQueryLimitMax).default(searchMospiDatasetsQueryLimitDefault).describe('Maximum number of dataset results')
+})
+
+export const searchMospiDatasetsResponseRecommendationsItemRelevanceMin = 0;
+export const searchMospiDatasetsResponseRecommendationsItemRelevanceMax = 100;
+
+
+
+export const SearchMospiDatasetsResponse = zod.object({
+  "query": zod.string().nullable(),
+  "catalogueStatus": zod.enum(['available', 'partial', 'unavailable']),
+  "recommendations": zod.array(zod.object({
+  "id": zod.string(),
+  "source": zod.enum(['igot', 'nssta']),
+  "sourceName": zod.string(),
+  "title": zod.string(),
+  "summary": zod.string(),
+  "type": zod.enum(['course', 'programme']),
+  "relevance": zod.number().int().min(searchMospiDatasetsResponseRecommendationsItemRelevanceMin).max(searchMospiDatasetsResponseRecommendationsItemRelevanceMax),
+  "destinationUrl": zod.string().url(),
+  "provider": zod.string().nullable(),
+  "duration": zod.string().nullable(),
+  "schedule": zod.string().nullable()
+})),
+  "sources": zod.array(zod.object({
+  "id": zod.enum(['igot', 'nssta']),
+  "name": zod.string(),
+  "status": zod.enum(['available', 'unavailable']),
+  "endpoint": zod.string().url(),
+  "message": zod.string().nullable()
+  }))
+})
+
+export const QuizQuestion = zod.object({
+  "id": zod.number(),
+  "question": zod.string(),
+  "options": zod.array(zod.string()),
+  "correctIndex": zod.number(),
+  "explanation": zod.string()
+})
+
+export const QuizResponse = zod.object({
+  "title": zod.string(),
+  "questions": zod.array(QuizQuestion)
+})
+
+export const QuizGenerateResponse = zod.object({
+  "quiz": QuizResponse
 })
 
 

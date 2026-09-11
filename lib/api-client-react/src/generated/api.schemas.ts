@@ -48,12 +48,15 @@ export interface GeminiChatInput {
   materialName?: string | null;
   /** @maxItems 1 */
   images?: GeminiChatInputImagesItem[];
+  provider?: string;
+  model?: string;
 }
 
 export interface GeminiChatResponse {
   message: string;
   model: string;
   groundedInMaterial: boolean;
+  provider?: string;
 }
 
 export interface LearningRecommendationsQuery {
@@ -150,6 +153,54 @@ export interface LearningRecommendationsResponse {
 export interface ErrorResponse {
   error: string;
 }
+
+export interface MospiDataset {
+  id: string;
+  /** @nullable */
+  idno?: string | null;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+}
+
+export interface MospiDatasetsResponse {
+  /** @nullable */
+  query?: string | null;
+  total: number;
+  datasets: MospiDataset[];
+}
+
+export type MospiRecommendationsResponseCatalogueStatus = typeof MospiRecommendationsResponseCatalogueStatus[keyof typeof MospiRecommendationsResponseCatalogueStatus];
+
+
+export const MospiRecommendationsResponseCatalogueStatus = {
+  available: 'available',
+  partial: 'partial',
+  unavailable: 'unavailable',
+} as const;
+
+export interface MospiRecommendationsResponse {
+  /** @nullable */
+  query: string | null;
+  catalogueStatus: MospiRecommendationsResponseCatalogueStatus;
+  recommendations: LearningRecommendation[];
+  sources: RecommendationSource[];
+}
+
+export type SearchMospiDatasetsParams = {
+/**
+ * Competency, topic, or learning goal to search MoSPI datasets for
+ * @minLength 2
+ * @maxLength 200
+ */
+query: string;
+/**
+ * Maximum number of dataset results
+ * @minimum 1
+ * @maximum 12
+ */
+limit?: number;
+};
 
 export type GetLearningRecommendationsParams = {
 /**

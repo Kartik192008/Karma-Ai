@@ -28,4 +28,6 @@ export interface GeminiChatInput {
   materialName?: string | null;
   /** @maxItems 1 */
   images?: GeminiChatInputImagesItem[];
+  provider?: string;
+  model?: string;
 }

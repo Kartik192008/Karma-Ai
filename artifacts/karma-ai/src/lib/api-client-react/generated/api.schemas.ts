@@ -166,3 +166,20 @@ query: string;
 limit?: number;
 };
 
+export interface QuizQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface QuizResponse {
+  title: string;
+  questions: QuizQuestion[];
+}
+
+export interface QuizGenerateResponse {
+  quiz: QuizResponse;
+}
+

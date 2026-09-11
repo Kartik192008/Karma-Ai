@@ -25,7 +25,9 @@ import type {
   GeminiChatResponse,
   GetLearningRecommendationsParams,
   HealthStatus,
-  LearningRecommendationsResponse
+  LearningRecommendationsResponse,
+  MospiRecommendationsResponse,
+  SearchMospiDatasetsParams
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -204,6 +206,91 @@ export const useSendGeminiChat = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getSendGeminiChatMutationOptions(options));
     }
+
+export const getSearchMospiDatasetsUrl = (params: SearchMospiDatasetsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/mospi-recommendations?${stringifiedParams}` : `/api/mospi-recommendations`
+}
+
+/**
+ * Searches the MoSPI Microdata Portal for datasets relevant to the query. Returns ranked official dataset metadata only.
+ * @summary Search official MoSPI datasets
+ */
+export const searchMospiDatasets = async (params: SearchMospiDatasetsParams, options?: Parameters<typeof customFetch>[1]): Promise<MospiRecommendationsResponse> => {
+
+  return customFetch<MospiRecommendationsResponse>(getSearchMospiDatasetsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchMospiDatasetsQueryKey = (params?: SearchMospiDatasetsParams,) => {
+    return [
+    `/api/mospi-recommendations`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchMospiDatasetsQueryOptions = <TData = Awaited<ReturnType<typeof searchMospiDatasets>>, TError = ErrorType<ErrorResponse>>(params: SearchMospiDatasetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchMospiDatasets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchMospiDatasetsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchMospiDatasets>>> = ({ signal }) => searchMospiDatasets(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchMospiDatasets>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchMospiDatasetsQueryResult = NonNullable<Awaited<ReturnType<typeof searchMospiDatasets>>>
+export type SearchMospiDatasetsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Search official MoSPI datasets
+ */
+
+export function useSearchMospiDatasets<TData = Awaited<ReturnType<typeof searchMospiDatasets>>, TError = ErrorType<ErrorResponse>>(
+ params: SearchMospiDatasetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchMospiDatasets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchMospiDatasetsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetLearningRecommendationsUrl = (params: GetLearningRecommendationsParams,) => {
   const normalizedParams = new URLSearchParams();

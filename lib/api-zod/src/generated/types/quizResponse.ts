@@ -5,10 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { QuizQuestion } from './quizQuestion';
 
-export interface GeminiChatResponse {
-  message: string;
-  model: string;
-  groundedInMaterial: boolean;
-  provider?: string;
+export interface QuizResponse {
+  title: string;
+  questions: QuizQuestion[];
 }

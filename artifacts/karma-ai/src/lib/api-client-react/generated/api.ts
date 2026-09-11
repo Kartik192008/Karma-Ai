@@ -25,7 +25,8 @@ import type {
   GeminiChatResponse,
   GetLearningRecommendationsParams,
   HealthStatus,
-  LearningRecommendationsResponse
+  LearningRecommendationsResponse,
+  QuizGenerateResponse
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -273,7 +274,7 @@ export type GetLearningRecommendationsQueryError = ErrorType<ErrorResponse>
  */
 
 export function useGetLearningRecommendations<TData = Awaited<ReturnType<typeof getLearningRecommendations>>, TError = ErrorType<ErrorResponse>>(
- params: GetLearningRecommendationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLearningRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  params: GetLearningRecommendationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLearningRecommendations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -283,6 +284,69 @@ export function useGetLearningRecommendations<TData = Awaited<ReturnType<typeof 
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+export const getGenerateQuizUrl = () => {
+  return `/api/quiz/generate`
+}
+
+export type GenerateQuizBody = {
+  materialText?: string | null;
+  materialName?: string | null;
+  message?: string;
+  provider?: string;
+  model?: string;
+}
+
+export const generateQuiz = async (generateQuizBody: GenerateQuizBody, options?: Parameters<typeof customFetch>[1]): Promise<QuizGenerateResponse> => {
+  return customFetch<QuizGenerateResponse>(getGenerateQuizUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(generateQuizBody)
+  }
+);}
+
+export const getGenerateQuizMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateQuiz>>, TError,{data: BodyType<GenerateQuizBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+  ): UseMutationOptions<Awaited<ReturnType<typeof generateQuiz>>, TError,{data: BodyType<GenerateQuizBody>}, TContext> => {
+
+const mutationKey = ['generateQuiz'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateQuiz>>, {data: BodyType<GenerateQuizBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateQuiz(data,requestOptions)
+        }
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+  export type GenerateQuizMutationResult = NonNullable<Awaited<ReturnType<typeof generateQuiz>>>
+  export type GenerateQuizMutationBody = BodyType<GenerateQuizBody>
+  export type GenerateQuizMutationError = ErrorType<ErrorResponse>
+
+  export const useGenerateQuiz = <TError = ErrorType<ErrorResponse>,
+      TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateQuiz>>, TError,{data: BodyType<GenerateQuizBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+  ): UseMutationResult<
+          Awaited<ReturnType<typeof generateQuiz>>,
+          TError,
+          {data: BodyType<GenerateQuizBody>},
+          TContext
+        > => {
+      return useMutation(getGenerateQuizMutationOptions(options));
+    }
+
 
 
 

@@ -195,6 +195,10 @@ components:
               data:
                 type: string
             required: []
+        provider:
+          type: string
+        model:
+          type: string
       required:
         - message
     GeminiChatResponse:
@@ -206,6 +210,8 @@ components:
           type: string
         groundedInMaterial:
           type: boolean
+        provider:
+          type: string
       required:
         - message
         - model
@@ -316,4 +322,53 @@ components:
           type: string
       required:
         - error
+    MospiDataset:
+      type: object
+      properties:
+        id:
+          type: string
+        idno:
+          type: ["string", "null"]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+      required:
+        - id
+        - title
+    MospiDatasetsResponse:
+      type: object
+      properties:
+        query:
+          type: ["string", "null"]
+        total:
+          type: integer
+        datasets:
+          type: array
+          items:
+            $ref: "#/components/schemas/MospiDataset"
+      required:
+        - total
+        - datasets
+    MospiRecommendationsResponse:
+      type: object
+      properties:
+        query:
+          type: ["string", "null"]
+        catalogueStatus:
+          type: string
+          enum: [available, partial, unavailable]
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/LearningRecommendation"
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecommendationSource"
+      required:
+        - query
+        - catalogueStatus
+        - recommendations
+        - sources
 

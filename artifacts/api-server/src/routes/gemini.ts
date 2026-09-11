@@ -3,12 +3,18 @@ import { SendGeminiChatBody, SendGeminiChatResponse } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
-const GEMINI_MODEL = "gemini-3.6-flash";
+const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const GEMINI_STREAM_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent`;
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "llama-3.1-70b-versatile";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+
+const AIML_MODEL = "mistralai/mistral-7b-instruct";
+const AIML_ENDPOINT = "https://api.aimlapi.com/v1/chat/completions";
+
+const HF_MODEL = "google/gemma-2-9b-it";
+const HF_ENDPOINT = "https://router.huggingface.co/hf-inference/v1/chat/completions";
 
 const KARMA_SYSTEM_PROMPT = `You are KARMA AI, a precise and encouraging learning assistant for officials and learners working with India's Official Statistical System.
 
@@ -161,87 +167,107 @@ router.post("/chat", async (req, res) => {
     return;
   }
 
-  const provider = (req.body.provider as string | undefined)?.toLowerCase();
-  const model = (req.body.model as string | undefined) || GROQ_MODEL;
+  const requestedProvider = parsed.data.provider?.toLowerCase();
+  const model = parsed.data.model || GROQ_MODEL;
 
-  if (!provider) {
-    res.status(400).json({ error: "Missing provider. Choose 'gemini' or 'groq'." });
+  if (!requestedProvider) {
+    res.status(400).json({ error: "Missing provider. Choose 'gemini', 'groq', 'aiml', or 'huggingface'." });
     return;
   }
 
-  if (provider === "gemini") {
-    return handleGemini(req, res, parsed.data, model || GEMINI_MODEL);
+  const providers = requestedProvider === "gemini" ? ["gemini", "groq", "aiml", "huggingface"] : requestedProvider === "groq" ? ["groq", "gemini", "aiml", "huggingface"] : requestedProvider === "huggingface" ? ["huggingface", "gemini", "groq", "aiml"] : ["aiml", "gemini", "groq", "huggingface"];
+  const models = requestedProvider === "gemini" ? [model || GEMINI_MODEL, GROQ_MODEL, AIML_MODEL, HF_MODEL] : requestedProvider === "groq" ? [model, GEMINI_MODEL, AIML_MODEL, HF_MODEL] : requestedProvider === "huggingface" ? [model || HF_MODEL, GEMINI_MODEL, GROQ_MODEL, AIML_MODEL] : [model || AIML_MODEL, GEMINI_MODEL, GROQ_MODEL, HF_MODEL];
+
+  let lastError: { status: number; message: string } | null = null;
+
+  for (let i = 0; i < providers.length; i++) {
+    const provider = providers[i];
+    const providerModel = models[i] || (provider === "gemini" ? GEMINI_MODEL : GROQ_MODEL);
+
+    try {
+      let result: { message: string; model: string };
+      if (provider === "gemini") {
+        result = await handleGemini(req, parsed.data, providerModel);
+      } else if (provider === "groq") {
+        result = await handleGroq(req, parsed.data, providerModel);
+      } else if (provider === "huggingface") {
+        result = await handleHuggingFace(req, parsed.data, providerModel);
+      } else {
+        result = await handleAiml(req, parsed.data, providerModel);
+      }
+      const data = SendGeminiChatResponse.parse({
+        message: result.message,
+        model: result.model,
+        groundedInMaterial: Boolean(parsed.data.materialText),
+        provider,
+      });
+      res.json(data);
+      return;
+    } catch (error) {
+      const status = error instanceof Error && error.message.includes("timed out") ? 504 : 502;
+      lastError = {
+        status,
+        message: error instanceof Error ? error.message : "KARMA AI is temporarily unavailable. Please try again.",
+      };
+      req.log.warn(
+        { err: error, provider, fallback: i < providers.length - 1 },
+        "Provider failed, attempting fallback",
+      );
+    }
   }
 
-  if (provider === "groq") {
-    return handleGroq(req, res, parsed.data, model);
-  }
-
-  res.status(400).json({ error: `Unsupported provider: ${provider}` });
+  res.status(lastError?.status ?? 502).json({ error: lastError?.message ?? "KARMA AI is temporarily unavailable. Please try again." });
 });
 
-async function handleGemini(req: any, res: any, data: any, model: string) {
+async function handleGemini(req: any, data: any, model: string): Promise<{ message: string; model: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    res.status(503).json({ error: "KARMA AI is not configured with a Gemini key yet." });
-    return;
+    throw new Error("KARMA AI is not configured with a Gemini key yet.");
   }
 
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-  try {
-    const response = await withTimeout(
-      fetch(`${endpoint}?key=${encodeURIComponent(apiKey)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildGeminiPayload(data.history, data.message, data.materialText, data.materialName, data.images)),
-      }),
-      30000,
-      "Gemini request",
+  const response = await withTimeout(
+    fetch(`${endpoint}?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildGeminiPayload(data.history, data.message, data.materialText, data.materialName, data.images)),
+    }),
+    30000,
+    "Gemini request",
+  );
+
+  const payload = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
+    error?: { message?: string; code?: number; status?: string };
+  };
+
+  if (!response.ok) {
+    const providerMessage = payload.error?.message ?? "Unknown provider error";
+    req.log.error(
+      { status: response.status, providerMessage, providerError: payload.error },
+      "Gemini request failed",
     );
-
-    const payload = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: GeminiPart[] } }>;
-      error?: { message?: string; code?: number; status?: string };
-    };
-
-    if (!response.ok) {
-      const providerMessage = payload.error?.message ?? "Unknown provider error";
-      req.log.error(
-        { status: response.status, providerMessage, providerError: payload.error },
-        "Gemini request failed",
-      );
-      const userMessage =
-        response.status === 429
-          ? "Gemini rate limit reached. Please wait a moment and try again."
-          : response.status === 400
-            ? `Gemini rejected the request: ${providerMessage}`
-            : "KARMA AI could not reach Gemini right now. Please try again.";
-      res.status(response.status === 429 ? 429 : 502).json({ error: userMessage });
-      return;
-    }
-
-    const answer = payload.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text ?? "")
-      .join("")
-      .trim();
-
-    if (!answer) {
-      req.log.warn({ payload }, "Gemini returned empty answer");
-      res.status(502).json({ error: "Gemini returned an empty response. Please try again." });
-      return;
-    }
-
-    const result = SendGeminiChatResponse.parse({
-      message: answer,
-      model,
-      groundedInMaterial: Boolean(data.materialText),
-    });
-    res.json(result);
-  } catch (error) {
-    req.log.error({ err: error }, "Unexpected Gemini request error");
-    res.status(502).json({ error: "KARMA AI is temporarily unavailable. Please try again." });
+    const userMessage =
+      response.status === 429
+        ? "Gemini rate limit reached."
+        : response.status === 400
+          ? `Gemini rejected the request: ${providerMessage}`
+          : "KARMA AI could not reach Gemini right now.";
+    throw new Error(userMessage);
   }
+
+  const answer = payload.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text ?? "")
+    .join("")
+    .trim();
+
+  if (!answer) {
+    req.log.warn({ payload }, "Gemini returned empty answer");
+    throw new Error("Gemini returned an empty response.");
+  }
+
+  return { message: answer, model };
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -251,11 +277,10 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
   return Promise.race([promise, timeout]);
 }
 
-async function handleGroq(req: any, res: any, data: any, model: string) {
+async function handleGroq(req: any, data: any, model: string): Promise<{ message: string; model: string }> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    res.status(503).json({ error: "KARMA AI is not configured with a Groq key yet." });
-    return;
+    throw new Error("KARMA AI is not configured with a Groq key yet.");
   }
 
   const messages: Array<{ role: string; content: string }> = [];
@@ -270,64 +295,184 @@ async function handleGroq(req: any, res: any, data: any, model: string) {
     : "";
   messages.push({ role: "user", content: `${data.message}${materialContext}` });
 
-  try {
-    const response = await withTimeout(
-      fetch(GROQ_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.35,
-          max_tokens: 8192,
-        }),
+  const response = await withTimeout(
+    fetch(GROQ_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.35,
+        max_tokens: 8192,
       }),
-      30000,
-      "Groq request",
+    }),
+    30000,
+    "Groq request",
+  );
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string; code?: number };
+  };
+
+  if (!response.ok) {
+    const providerMessage = payload.error?.message ?? "Unknown provider error";
+    req.log.error(
+      { status: response.status, providerMessage, providerError: payload.error },
+      "Groq request failed",
     );
-
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message?: string; code?: number };
-    };
-
-    if (!response.ok) {
-      const providerMessage = payload.error?.message ?? "Unknown provider error";
-      req.log.error(
-        { status: response.status, providerMessage, providerError: payload.error },
-        "Groq request failed",
-      );
-      const userMessage =
-        response.status === 429
-          ? "Groq rate limit reached. Please wait a moment and try again."
-          : response.status === 400
-            ? `Groq rejected the request: ${providerMessage}`
-            : "KARMA AI could not reach Groq right now. Please try again.";
-      res.status(response.status === 429 ? 429 : 502).json({ error: userMessage });
-      return;
-    }
-
-    const answer = payload.choices?.[0]?.message?.content?.trim();
-
-    if (!answer) {
-      req.log.warn({ payload }, "Groq returned empty answer");
-      res.status(502).json({ error: "Groq returned an empty response. Please try again." });
-      return;
-    }
-
-    const result = SendGeminiChatResponse.parse({
-      message: answer,
-      model: `groq/${model}`,
-      groundedInMaterial: Boolean(data.materialText),
-    });
-    res.json(result);
-  } catch (error) {
-    req.log.error({ err: error }, "Unexpected Groq request error");
-    res.status(502).json({ error: "KARMA AI is temporarily unavailable. Please try again." });
+    const userMessage =
+      response.status === 429
+        ? "Groq rate limit reached."
+        : response.status === 400
+          ? `Groq rejected the request: ${providerMessage}`
+          : "KARMA AI could not reach Groq right now.";
+    throw new Error(userMessage);
   }
+
+  const answer = payload.choices?.[0]?.message?.content?.trim();
+
+  if (!answer) {
+    req.log.warn({ payload }, "Groq returned empty answer");
+    throw new Error("Groq returned an empty response.");
+  }
+
+  return { message: answer, model: `groq/${model}` };
+}
+
+async function handleAiml(req: any, data: any, model: string): Promise<{ message: string; model: string }> {
+  const apiKey = process.env.AIML_API_KEY;
+  if (!apiKey) {
+    throw new Error("KARMA AI is not configured with an AIML API key yet.");
+  }
+
+  const messages: Array<{ role: string; content: string }> = [];
+  if (data.history?.length) {
+    for (const item of data.history) {
+      messages.push({ role: item.role === "assistant" ? "assistant" : "user", content: item.content });
+    }
+  }
+
+  const materialContext = data.materialText
+    ? `\n\nLearning material${data.materialName ? ` (${data.materialName})` : ""}:\n${data.materialText}`
+    : "";
+  messages.push({ role: "user", content: `${data.message}${materialContext}` });
+
+  const response = await withTimeout(
+    fetch(AIML_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.35,
+        max_tokens: 8192,
+      }),
+    }),
+    30000,
+    "AIML request",
+  );
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string; code?: number };
+  };
+
+  if (!response.ok) {
+    const providerMessage = payload.error?.message ?? "Unknown provider error";
+    req.log.error(
+      { status: response.status, providerMessage, providerError: payload.error },
+      "AIML request failed",
+    );
+    const userMessage =
+      response.status === 429
+        ? "AIML rate limit reached."
+        : response.status === 400
+          ? `AIML rejected the request: ${providerMessage}`
+          : "KARMA AI could not reach AIML right now.";
+    throw new Error(userMessage);
+  }
+
+  const answer = payload.choices?.[0]?.message?.content?.trim();
+
+  if (!answer) {
+    req.log.warn({ payload }, "AIML returned empty answer");
+    throw new Error("AIML returned an empty response.");
+  }
+
+  return { message: answer, model: `aiml/${model}` };
+}
+
+async function handleHuggingFace(req: any, data: any, model: string): Promise<{ message: string; model: string }> {
+  const apiKey = process.env.HF_API_TOKEN;
+  if (!apiKey) {
+    throw new Error("KARMA AI is not configured with a HuggingFace token yet.");
+  }
+
+  const messages: Array<{ role: string; content: string }> = [];
+  if (data.history?.length) {
+    for (const item of data.history) {
+      messages.push({ role: item.role === "assistant" ? "assistant" : "user", content: item.content });
+    }
+  }
+
+  const materialContext = data.materialText
+    ? `\n\nLearning material${data.materialName ? ` (${data.materialName})` : ""}:\n${data.materialText}`
+    : "";
+  messages.push({ role: "user", content: `${data.message}${materialContext}` });
+
+  const response = await withTimeout(
+    fetch(HF_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.35,
+        max_tokens: 8192,
+      }),
+    }),
+    30000,
+    "HuggingFace request",
+  );
+
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string; code?: number };
+  };
+
+  if (!response.ok) {
+    const providerMessage = payload.error?.message ?? "Unknown provider error";
+    req.log.error(
+      { status: response.status, providerMessage, providerError: payload.error },
+      "HuggingFace request failed",
+    );
+    const userMessage =
+      response.status === 429
+        ? "HuggingFace rate limit reached."
+        : response.status === 400
+          ? `HuggingFace rejected the request: ${providerMessage}`
+          : "KARMA AI could not reach HuggingFace right now.";
+    throw new Error(userMessage);
+  }
+
+  const answer = payload.choices?.[0]?.message?.content?.trim();
+
+  if (!answer) {
+    req.log.warn({ payload }, "HuggingFace returned empty answer");
+    throw new Error("HuggingFace returned an empty response.");
+  }
+
+  return { message: answer, model: `huggingface/${model}` };
 }
 
 router.post("/gemini/chat-stream", async (req, res) => {
