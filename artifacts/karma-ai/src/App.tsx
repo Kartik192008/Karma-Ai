@@ -78,6 +78,9 @@ function unsupportedFileMessage(file: File) {
 
 function Home() {
   const [, setLocation] = useLocation();
+  const [homePdfOpen, setHomePdfOpen] = useState(false);
+  const [homePdfText, setHomePdfText] = useState('');
+  const [homeFileError, setHomeFileError] = useState('');
 
   return (
     <div className="grain min-h-[100dvh] overflow-hidden bg-background text-foreground">
@@ -173,6 +176,70 @@ function Home() {
           </div>
         </section>
 
+        <section id="mospi-dataset" className="border-y border-border bg-[hsl(218_28%_92%_/_0.35)]">
+          <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-8 lg:px-10 lg:py-24">
+            <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-center">
+              <div>
+                <p className="font-mono-label text-[0.63rem] font-medium uppercase text-primary">03 / Official data</p>
+                <h2 className="mt-5 font-display text-5xl leading-[0.93] tracking-[-0.04em] sm:text-6xl">Work with a real MoSPI dataset.</h2>
+                <p className="mt-5 max-w-[460px] text-sm leading-7 text-muted-foreground">
+                  Use the sample PLFS extract to explore how KARMA grounds answers in official microdata. Open the source catalog entry or preview the file content directly.
+                </p>
+                <div className="mt-7 flex flex-wrap items-center gap-3">
+                  <a
+                    href="https://microdata.gov.in/NADA/index.php/catalog/284"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-[0.7rem] font-bold uppercase tracking-[0.13em] text-primary-foreground shadow-[0_8px_22px_hsl(179_34%_34%_/_0.16)] transition-transform hover:-translate-y-0.5"
+                    data-testid="link-mospi-catalog"
+                  >
+                    Open MoSPI source <ArrowUpRight className="size-3.5" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('/mospi-plfs-sample.csv');
+                        const text = await response.text();
+                        setHomePdfText(text);
+                        setHomePdfOpen(true);
+                      } catch (error) {
+                        setHomeFileError('Could not load demo file.');
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-[0.7rem] font-bold uppercase tracking-[0.13em] text-foreground transition-colors hover:border-primary/30"
+                    data-testid="button-view-dataset"
+                  >
+                    View dataset content
+                  </button>
+                </div>
+                {homeFileError && <p className="mt-2 text-xs text-destructive" role="alert">{homeFileError}</p>}
+                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Landmark className="size-3.5 text-primary" />
+                  <span>Source: MoSPI Microdata catalog ID 284 · PLFS household extract</span>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-[0_18px_50px_hsl(218_34%_17%_/_0.08)]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Demo file</p>
+                    <p className="mt-1 text-sm font-extrabold">mospi-plfs-sample.csv</p>
+                  </div>
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-accent text-primary"><FileText className="size-4" /></span>
+                </div>
+                <div className="mt-5 space-y-2 text-xs leading-6 text-muted-foreground">
+                  <p>Household-level extract with employment status, sector, income, and demographic fields.</p>
+                  <p>Use it to test explanations, quiz generation, and learning recommendations.</p>
+                </div>
+                <div className="mt-5 rounded-xl border border-border bg-background p-4">
+                  <p className="font-mono-label text-[0.59rem] uppercase text-primary">Preview</p>
+                  <p className="mt-2 font-mono text-[0.7rem] leading-6 text-muted-foreground">state, district, rural_urban, age, sex, education_level, employment_status ...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="bg-primary text-primary-foreground">
           <div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-9 px-5 py-16 sm:px-8 lg:flex-row lg:items-center lg:px-10 lg:py-20">
             <div>
@@ -192,6 +259,23 @@ function Home() {
         <span>Learning intelligence for public service</span>
         <button type="button" onClick={() => setLocation('/chat')} className="text-left text-primary hover:text-primary/70 sm:text-right" data-testid="button-footer-assistant">Go to assistant <span aria-hidden="true">↗</span></button>
       </footer>
+
+      {homePdfOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setHomePdfOpen(false)}>
+          <div className="w-full max-w-[760px] max-h-[85vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 flex items-center justify-between border-b border-border bg-card px-5 py-4 backdrop-blur-md">
+              <div>
+                <h2 className="font-display text-lg font-extrabold tracking-[-0.03em]">mospi-plfs-sample.csv</h2>
+                <p className="text-xs text-muted-foreground">MoSPI PLFS household extract</p>
+              </div>
+              <button type="button" onClick={() => setHomePdfOpen(false)} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-primary" aria-label="Close dataset viewer"><X className="size-4" /></button>
+            </div>
+            <div className="p-5">
+              <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-muted-foreground">{homePdfText}</pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -514,7 +598,7 @@ function Chat() {
             onChange={(event) => {
               const next = event.target.value as 'gemini' | 'groq' | 'aiml' | 'huggingface';
               setProvider(next);
-               setModel(next === 'groq' ? 'llama-3.1-70b-versatile' : next === 'aiml' ? 'mistralai/mistral-7b-instruct' : next === 'huggingface' ? 'google/gemma-2-9b-it' : 'gemini-3.6-flash');
+              setModel(next === 'groq' ? 'llama-3.1-70b-versatile' : next === 'aiml' ? 'mistralai/mistral-7b-instruct' : next === 'huggingface' ? 'google/gemma-2-9b-it' : 'gemini-3.6-flash');
             }}
             className="rounded-md border border-border bg-background px-2 py-1 text-xs"
             data-testid="select-provider"
@@ -705,10 +789,28 @@ function QuizModal({ quiz, open, onClose, answers, onAnswer, submitted, onSubmit
   score: number;
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showResults, setShowResults] = useState(false);
+  const [roadmap, setRoadmap] = useState<string | null>(null);
+  const [courseQuery, setCourseQuery] = useState('');
+  const [submittedCourseQuery, setSubmittedCourseQuery] = useState('');
+  const recommendations = useGetLearningRecommendations(
+    { query: submittedCourseQuery || 'statistics', limit: 6 },
+    {
+      query: {
+        enabled: Boolean(submittedCourseQuery),
+        retry: 1,
+        queryKey: ['quiz-recommendations', submittedCourseQuery],
+      },
+    },
+  );
 
   useEffect(() => {
     if (open) {
       setCurrentIndex(0);
+      setShowResults(false);
+      setRoadmap(null);
+      setCourseQuery('');
+      setSubmittedCourseQuery('');
     }
   }, [open]);
 
@@ -716,94 +818,198 @@ function QuizModal({ quiz, open, onClose, answers, onAnswer, submitted, onSubmit
 
   const question = quiz.quiz.questions[currentIndex];
   const total = quiz.quiz.questions.length;
+  const wrongQuestions = quiz.quiz.questions.filter((q) => answers[q.id] !== q.correctIndex);
+  const skillGaps = wrongQuestions.map((q) => q.question);
+
+  const generateRoadmap = () => {
+    const percent = total === 0 ? 0 : Math.round((score / total) * 100);
+    const weakAreas = skillGaps.length ? skillGaps.slice(0, 3).join('; ') : 'none detected';
+    setRoadmap(
+      `You scored ${score}/${total} (${percent}%). Focus first on: ${weakAreas}. After that, revise the correct answers and retake the quiz to strengthen recall.`,
+    );
+  };
+
+  const handleSubmitQuiz = () => {
+    onSubmit();
+    setShowResults(true);
+    generateRoadmap();
+  };
+
+  const submitCourseSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = courseQuery.trim();
+    if (trimmed.length >= 2) {
+      setSubmittedCourseQuery(trimmed);
+    }
+  };
+
+  const handleClose = () => {
+    onClose();
+    setShowResults(false);
+    setRoadmap(null);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={handleClose}>
       <div className="w-full max-w-[640px] max-h-[85vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 flex items-center justify-between border-b border-border bg-card px-5 py-4 backdrop-blur-md">
           <div>
             <h2 className="font-display text-lg font-extrabold tracking-[-0.03em]">{quiz.quiz.title}</h2>
             <p className="text-xs text-muted-foreground">Question {currentIndex + 1} of {total}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-primary" aria-label="Close quiz"><X className="size-4" /></button>
+          <button type="button" onClick={handleClose} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-primary" aria-label="Close quiz"><X className="size-4" /></button>
         </div>
 
         <div className="p-5">
-          {question && (
+          {!showResults ? (
             <div>
-              <div className="mb-4">
-                <p className="text-sm font-extrabold leading-7">{question.question}</p>
-              </div>
-              <div className="space-y-2.5">
-                {question.options.map((option, index) => {
-                  const isSelected = answers[question.id] === index;
-                  const isCorrect = index === question.correctIndex;
-                  const showResult = submitted;
+              {question && (
+                <div>
+                  <div className="mb-4">
+                    <p className="text-sm font-extrabold leading-7">{question.question}</p>
+                  </div>
+                  <div className="space-y-2.5">
+                    {question.options.map((option, index) => {
+                      const isSelected = answers[question.id] === index;
+                      const isCorrect = index === question.correctIndex;
+                      const showResult = submitted;
 
-                  return (
+                      return (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => !submitted && onAnswer(question.id, index)}
+                          disabled={submitted}
+                          className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
+                            showResult && isCorrect
+                              ? 'border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400'
+                              : showResult && isSelected && !isCorrect
+                                ? 'border-destructive/50 bg-destructive/10 text-destructive'
+                                : isSelected
+                                  ? 'border-primary bg-accent'
+                                  : 'border-border bg-background hover:border-primary/30'
+                          } ${submitted ? 'cursor-default' : 'cursor-pointer'}`}
+                        >
+                          <span className="mr-2 inline-flex size-5 items-center justify-center rounded-full border border-current text-xs font-bold">
+                            {String.fromCharCode(65 + index)}
+                          </span>
+                          {option}
+                          {showResult && isCorrect && <Check className="ml-auto size-4 text-green-600" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {submitted && question.explanation && (
+                    <div className="mt-4 rounded-xl border border-primary/20 bg-accent/50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Explanation</p>
+                      <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-6 flex items-center justify-between">
                     <button
-                      key={index}
                       type="button"
-                      onClick={() => !submitted && onAnswer(question.id, index)}
-                      disabled={submitted}
-                      className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
-                        showResult && isCorrect
-                          ? 'border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400'
-                          : showResult && isSelected && !isCorrect
-                            ? 'border-destructive/50 bg-destructive/10 text-destructive'
-                            : isSelected
-                              ? 'border-primary bg-accent'
-                              : 'border-border bg-background hover:border-primary/30'
-                      } ${submitted ? 'cursor-default' : 'cursor-pointer'}`}
+                      onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+                      disabled={currentIndex === 0}
+                      className="rounded-lg border border-border px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <span className="mr-2 inline-flex size-5 items-center justify-center rounded-full border border-current text-xs font-bold">
-                        {String.fromCharCode(65 + index)}
-                      </span>
-                      {option}
-                      {showResult && isCorrect && <Check className="ml-auto size-4 text-green-600" />}
+                      Previous
                     </button>
-                  );
-                })}
-              </div>
 
-              {submitted && question.explanation && (
-                <div className="mt-4 rounded-xl border border-primary/20 bg-accent/50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Explanation</p>
-                  <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{question.explanation}</p>
+                    <span className="text-xs text-muted-foreground">
+                      {submitted && `${score} / ${total} correct`}
+                    </span>
+
+                    {currentIndex < total - 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setCurrentIndex((i) => Math.min(total - 1, i + 1))}
+                        className="rounded-lg bg-primary px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-primary-foreground"
+                      >
+                        Next
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSubmitQuiz}
+                        className="rounded-lg bg-secondary px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-secondary-foreground"
+                      >
+                        {submitted ? 'Finish' : 'Submit Quiz'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div>
+                <p className="text-sm font-extrabold">Quiz complete</p>
+                <p className="mt-1 text-xs text-muted-foreground">You scored {score} out of {total}.</p>
+              </div>
 
-              <div className="mt-6 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-                  disabled={currentIndex === 0}
-                  className="rounded-lg border border-border px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Previous
-                </button>
+              <div className="rounded-xl border border-border bg-background p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Skill gap check</p>
+                <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                  {skillGaps.length === 0
+                    ? 'No clear skill gaps detected from this quiz.'
+                    : `Review these areas: ${skillGaps.join('; ')}`}
+                </p>
+              </div>
 
-                <span className="text-xs text-muted-foreground">
-                  {submitted && `${score} / ${total} correct`}
-                </span>
-
-                {currentIndex < total - 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => setCurrentIndex((i) => Math.min(total - 1, i + 1))}
-                    className="rounded-lg bg-primary px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-primary-foreground"
-                  >
-                    Next
-                  </button>
+              <div className="rounded-xl border border-border bg-background p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">Personalized roadmap</p>
+                {!roadmap ? (
+                  <button type="button" onClick={generateRoadmap} className="mt-2 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground">Generate roadmap</button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={submitted ? onClose : onSubmit}
-                    className="rounded-lg bg-secondary px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-secondary-foreground"
-                  >
-                    {submitted ? 'Finish' : 'Submit Quiz'}
-                  </button>
+                  <p className="mt-2 text-xs leading-6 text-muted-foreground">{roadmap}</p>
                 )}
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">iGOT Karmayogi course match</p>
+                <form onSubmit={submitCourseSearch} className="mt-3 flex gap-2" data-testid="form-quiz-courses">
+                  <input
+                    value={courseQuery}
+                    onChange={(event) => setCourseQuery(event.target.value)}
+                    placeholder="Search a topic like NSS, CPI, or digital governance"
+                    maxLength={200}
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary/50"
+                    data-testid="input-quiz-course-query"
+                  />
+                  <button
+                    type="submit"
+                    disabled={courseQuery.trim().length < 2 || recommendations.isLoading}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Search courses"
+                    data-testid="button-search-quiz-courses"
+                  >
+                    <Search className="size-3.5" />
+                  </button>
+                </form>
+                {recommendations.isLoading && <p className="mt-2 text-xs text-muted-foreground">Searching courses…</p>}
+                {recommendations.error && <p className="mt-2 text-xs text-destructive">Could not load courses.</p>}
+                {recommendations.data && recommendations.data.recommendations.length > 0 && (
+                  <div className="mt-3 space-y-2" data-testid="quiz-course-results">
+                    {recommendations.data.recommendations.map((item) => (
+                      <a
+                        key={item.id}
+                        href={item.destinationUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="block rounded-xl border border-border bg-background p-3 transition-colors hover:border-primary/30"
+                      >
+                        <p className="text-xs font-extrabold leading-5">{item.title}</p>
+                        <p className="mt-1 line-clamp-2 text-[0.68rem] leading-5 text-muted-foreground">{item.summary}</p>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-2 flex justify-end">
+                <button type="button" onClick={handleClose} className="rounded-lg bg-secondary px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-secondary-foreground">Close</button>
               </div>
             </div>
           )}

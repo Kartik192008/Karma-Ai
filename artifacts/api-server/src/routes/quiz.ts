@@ -65,7 +65,7 @@ const QuizResponseSchema = z.object({
 });
 
 router.post("/quiz/generate", async (req, res) => {
-  const { materialText, materialName, message, provider = "gemini", model = GEMINI_MODEL } = req.body;
+  const { materialText, materialName, message } = req.body;
 
   if (!materialText && !message) {
     res.status(400).json({ error: "Please provide material text or a message to generate a quiz." });
