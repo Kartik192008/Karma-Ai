@@ -187,7 +187,7 @@ function Home() {
                 </p>
                 <div className="mt-7 flex flex-wrap items-center gap-3">
                   <a
-                    href="https://microdata.gov.in/NADA/index.php/catalog/284"
+                    href="https://www.mospi.gov.in/themes/product/69-periodic-labour-force-survey-plfs"
                     target="_blank"
                     rel="noreferrer noopener"
                     className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-[0.7rem] font-bold uppercase tracking-[0.13em] text-primary-foreground shadow-[0_8px_22px_hsl(179_34%_34%_/_0.16)] transition-transform hover:-translate-y-0.5"
